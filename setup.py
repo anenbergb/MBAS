@@ -1,0 +1,53 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="mgmt",
+    version="1.0.0",
+    url="https://github.com/anenbergb/MBAS",
+    author="Bryan Anenberg",
+    author_email="anenbergb@gmail.com",
+    description="Python libraries developed for the MICCAI MBAS 2024 - Multi-class Bi-Atrial Segmentation Challenge",
+    python_requires=">=3.10",
+    packages=find_packages(),
+    install_requires=[
+        "numpy",
+        "monai",
+        "tensorboard",
+        "tensorboard-plugin-3d",
+        "pandas",
+        "pandas-stubs",
+        "opencv-python",
+        "loguru",
+        "matplotlib",
+        "ffmpeg-python",
+        "tqdm",
+        "types-tqdm",
+        "pillow",
+        "types-Pillow",
+        "yacs",
+        "lightning",
+        "pytorch-lightning[extra]",
+        "torchmetrics",
+        "torchio",
+        "fvcore",
+        "iopath",
+        "seaborn",
+        "loguru",
+        "ray[tune]",
+        "scikit-learn"
+    ],
+    extras_require={
+        "torch": [
+            "torch",
+            "torchvision",
+        ],
+        "notebook": [
+            "jupyter",
+            "itkwidgets",
+            "jupyter_contrib_nbextensions",
+            "plotly",
+            "seaborn",
+        ],
+        "dev": ["black", "mypy", "flake8", "isort", "ipdb"],
+    },
+)
