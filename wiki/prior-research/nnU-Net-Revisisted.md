@@ -1,4 +1,7 @@
 # nnU-Net Revisited:A Call for Rigorous Validation in 3D Medical Image Segmentation
+Reference: https://arxiv.org/pdf/2404.09556
+
+  
 - Demonstrates that many recent architectures that claim superior performance over the U-Net baseline actually were not adequately tested. Inadequate baselines, insufficient datasets, neglected computational resources.
 - Comprehensive benchmark of CNN-based, Transformer-based, and Mamba-based approaches.\
 ### Conclusion
