@@ -1,4 +1,5 @@
 # nnU-Net "no new net": a self-configuring method for deep learning-based biomedical image segmentation
+
 distilling domain knowledge into 3 parameter groups
 - fixed
 - rule-based
@@ -30,3 +31,6 @@ distilling domain knowledge into 3 parameter groups
 - While nnU-Net was shown to robustly find high quality configurations on new datasets, task-specific empirical optimization may have the potential to further improve the segmentation performance
 - nnU-Net has an advantage over empirical AutoML approaches because each nnU-Net design decision can be traced back to either a certain dataset property or liimited set of emperical experiements
 - It could be a good idea to enhance nnU-Net proposed recipe with empirical optimization of selected design decisions such as data augmentation or network architecture.
+
+# Supplementary Information
+Reference: https://static-content.springer.com/esm/art%3A10.1038%2Fs41592-020-01008-z/MediaObjects/41592_2020_1008_MOESM1_ESM.pdf
