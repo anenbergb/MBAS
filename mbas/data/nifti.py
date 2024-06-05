@@ -5,7 +5,9 @@ from typing import Optional
 import torchio as tio
 
 
-def get_file_name(basename: str, extensions: list[str] = [".nii", ".nii.gz"]) -> Optional[str]:
+def get_file_name(
+    basename: str, extensions: list[str] = [".nii", ".nii.gz"]
+) -> Optional[str]:
     for ext in extensions:
         filepath = f"{basename}{ext}"
         if os.path.exists(filepath):
@@ -19,14 +21,24 @@ def make_subject(
     extension: list[str] = [".nii", ".nii.gz"],
 ) -> tio.Subject:
     # patient_id_str is formatted "MBAS_002"
-    patient_id_str = os.path.dirname(folder_path)
+    patient_id_str = os.path.basename(folder_path)
     patient_id = int(patient_id_str.split("_")[-1])
-    mri = tio.ScalarImage(path=get_file_name(os.path.join(folder_path, f"{patient_id_str}_gt"), extension), name="mri")
-    label = tio.LabelMap(path=get_file_name(os.path.join(folder_path, f"{patient_id_str}_label"), extension), name="label")
+    mri = tio.ScalarImage(
+        path=get_file_name(
+            os.path.join(folder_path, f"{patient_id_str}_gt"), extension
+        ),
+        name="mri",
+    )
+    label = tio.LabelMap(
+        path=get_file_name(
+            os.path.join(folder_path, f"{patient_id_str}_label"), extension
+        ),
+        name="label",
+    )
 
     subject = tio.Subject(
-        mri = mri, 
-        label = label,
+        mri=mri,
+        label=label,
         patient_id=patient_id,
         patient_id_str=patient_id_str,
         train_test_split=train_test_split,
@@ -34,7 +46,9 @@ def make_subject(
     return subject
 
 
-def load_label_csv(csv_path: str = "/home/bryan/data/brain_tumor/classification/train_labels.csv") -> dict[str, int]:
+def load_label_csv(
+    csv_path: str = "/home/bryan/data/brain_tumor/classification/train_labels.csv",
+) -> dict[str, int]:
     with open(csv_path, "r") as f:
         csv_reader = csv.reader(f, delimiter=",")
         rows = [row for row in csv_reader]
@@ -64,9 +78,7 @@ def load_subjects(
     train_folders = get_subject_folders(os.path.join(dataset_folder, "Training"))
     val_folders = get_subject_folders(os.path.join(dataset_folder, "Validation"))
 
-    train_subjects = [
-        make_subject(x, "train") for x in train_folders
-    ]
+    train_subjects = [make_subject(x, "train") for x in train_folders]
     val_subjects = [make_subject(x, "validation") for x in val_folders]
     subjects = train_subjects + val_subjects
     subjects = sorted(subjects, key=lambda x: x.patient_id)

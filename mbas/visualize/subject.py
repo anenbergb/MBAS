@@ -71,9 +71,27 @@ def plot_volume(
         kwargs["vmax"] = p2
 
     axes_map = {
-        "sagittal": {"aspect": ss / sa, "slice": slice_x, "xlabel": "A", "ylabel": "S", "title": "Sagittal"},
-        "coronal": {"aspect": ss / sr, "slice": slice_y, "xlabel": "R", "ylabel": "S", "title": "Coronal"},
-        "axial": {"aspect": sa / sr, "slice": slice_z, "xlabel": "R", "ylabel": "A", "title": "Axial"},
+        "sagittal": {
+            "aspect": ss / sa,
+            "slice": slice_x,
+            "xlabel": "A",
+            "ylabel": "S",
+            "title": "Sagittal",
+        },
+        "coronal": {
+            "aspect": ss / sr,
+            "slice": slice_y,
+            "xlabel": "R",
+            "ylabel": "S",
+            "title": "Coronal",
+        },
+        "axial": {
+            "aspect": sa / sr,
+            "slice": slice_z,
+            "xlabel": "R",
+            "ylabel": "A",
+            "title": "Axial",
+        },
     }
 
     for i, axes_name in enumerate(axes_names):
@@ -155,16 +173,36 @@ def plot_volume_with_label(
 
     image_slices = prepare_slices(image)
     label_slices = prepare_slices(label)
-    slice_x, slice_y, slice_z = (blend_slice(i, l) for i, l in zip(image_slices, label_slices))
+    slice_x, slice_y, slice_z = (
+        blend_slice(i, l) for i, l in zip(image_slices, label_slices)
+    )
 
     kwargs = {}
     sr, sa, ss = image.spacing
     kwargs["origin"] = "lower"
 
     axes_map = {
-        "sagittal": {"aspect": ss / sa, "slice": slice_x, "xlabel": "A", "ylabel": "S", "title": "Sagittal"},
-        "coronal": {"aspect": ss / sr, "slice": slice_y, "xlabel": "R", "ylabel": "S", "title": "Coronal"},
-        "axial": {"aspect": sa / sr, "slice": slice_z, "xlabel": "R", "ylabel": "A", "title": "Axial"},
+        "sagittal": {
+            "aspect": ss / sa,
+            "slice": slice_x,
+            "xlabel": "A",
+            "ylabel": "S",
+            "title": "Sagittal",
+        },
+        "coronal": {
+            "aspect": ss / sr,
+            "slice": slice_y,
+            "xlabel": "R",
+            "ylabel": "S",
+            "title": "Coronal",
+        },
+        "axial": {
+            "aspect": sa / sr,
+            "slice": slice_z,
+            "xlabel": "R",
+            "ylabel": "A",
+            "title": "Axial",
+        },
     }
 
     for i, axes_name in enumerate(axes_names):
@@ -219,7 +257,9 @@ def plot_subject(
     # The array of axes must be 2D so that it can be indexed correctly within
     # the plot_volume() function
     axes = axes.T if many_images else axes.reshape(-1, num_rows)
-    iterable = enumerate(subject.get_images_dict(include=subject_include, intensity_only=False).items())
+    iterable = enumerate(
+        subject.get_images_dict(include=subject_include, intensity_only=False).items()
+    )
     for image_index, (name, image) in iterable:
         image_axes = axes[image_index]
         cmap = None
@@ -239,7 +279,9 @@ def plot_subject(
             axis.set_title(f"{name} ({axis_name})")
 
     if add_metadata:
-        legend = make_subject_metadata_legend(fig, subject, loc="upper left", bbox_to_anchor=(0.0, 0.0))
+        legend = make_subject_metadata_legend(
+            fig, subject, loc="upper left", bbox_to_anchor=(0.0, 0.0)
+        )
         fig.add_artist(legend)
 
     fig.tight_layout(pad=0)
@@ -298,7 +340,9 @@ def plot_subject_with_label(
     # The array of axes must be 2D so that it can be indexed correctly within
     # the plot_volume() function
     axes = axes.T if many_images else axes.reshape(-1, num_rows)
-    iterable = enumerate(subject.get_images_dict(include=subject_include, intensity_only=True).items())
+    iterable = enumerate(
+        subject.get_images_dict(include=subject_include, intensity_only=True).items()
+    )
     label_image = subject[label_key]
     for image_index, (name, image) in iterable:
         image_axes = axes[image_index]
@@ -317,11 +361,15 @@ def plot_subject_with_label(
             axis.set_title(f"{name} ({axis_name})")
 
     if add_metadata:
-        legend = make_subject_metadata_legend(fig, subject, loc="upper left", bbox_to_anchor=(0.0, 0.0))
+        legend = make_subject_metadata_legend(
+            fig, subject, loc="upper left", bbox_to_anchor=(0.0, 0.0)
+        )
         fig.add_artist(legend)
 
     if add_segmentation_legend:
-        loc, bbox_to_anchor = ("upper right", (1.0, 0.0)) if add_metadata else ("upper left", (0.0, 0.0))
+        loc, bbox_to_anchor = (
+            ("upper right", (1.0, 0.0)) if add_metadata else ("upper left", (0.0, 0.0))
+        )
         legend = make_segmentation_legend(fig, loc=loc, bbox_to_anchor=bbox_to_anchor)
         fig.add_artist(legend)
 
@@ -368,7 +416,9 @@ def render_subject_metadata(
     return arr
 
 
-def make_subject_metadata_legend(fig, subject: tio.Subject, fontsize=12, loc="upper left", bbox_to_anchor=(0.0, 0.0)):
+def make_subject_metadata_legend(
+    fig, subject: tio.Subject, fontsize=12, loc="upper left", bbox_to_anchor=(0.0, 0.0)
+):
     import matplotlib.patches as mpatches
 
     from mbas.data.subject_utils import get_subject_nonimages
@@ -379,5 +429,7 @@ def make_subject_metadata_legend(fig, subject: tio.Subject, fontsize=12, loc="up
         patch = mpatches.Patch(color="black", label=label)
         patches.append(patch)
 
-    legend = fig.legend(handles=patches, loc=loc, fontsize=fontsize, bbox_to_anchor=bbox_to_anchor)
+    legend = fig.legend(
+        handles=patches, loc=loc, fontsize=fontsize, bbox_to_anchor=bbox_to_anchor
+    )
     return legend

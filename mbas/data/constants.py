@@ -15,16 +15,13 @@ from collections import OrderedDict
 #     3: "yellow"
 # })
 
-MBAS_LABELS = OrderedDict({
-    0: "Background",
-    1: "Left & Right Atrium Wall",
-    2: "Right Atrium Cavity",
-    3: "Left Atrium Cavity",
-})
+MBAS_LABELS = OrderedDict(
+    {
+        0: "Background",
+        1: "Left & Right Atrium Wall",
+        2: "Right Atrium Cavity",
+        3: "Left Atrium Cavity",
+    }
+)
 
-MBAS_LABEL_COLORS = OrderedDict({
-    0: "black",
-    1: "yellow",
-    2: "red",
-    3: "blue"
-})
+MBAS_LABEL_COLORS = OrderedDict({0: "black", 1: "yellow", 2: "red", 3: "blue"})

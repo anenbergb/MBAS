@@ -9,11 +9,14 @@ from monai.transforms.utils import rescale_array
 from PIL import Image
 
 from mbas.data.constants import MBAS_LABELS, MBAS_LABEL_COLORS
+
 # mbas_colormap = matplotlib.colors.ListedColormap(MBAS_LABEL_COLORS.values(), name = "mbas")
 # matplotlib.colormaps.register(mbas_colormap)
 
 
-def plot_classification_grid(preds: np.ndarray, target: np.ndarray, patient_id: np.ndarray) -> np.ndarray:
+def plot_classification_grid(
+    preds: np.ndarray, target: np.ndarray, patient_id: np.ndarray
+) -> np.ndarray:
     assert len(preds) == len(target)
     assert len(preds) == len(patient_id)
 
@@ -24,7 +27,9 @@ def plot_classification_grid(preds: np.ndarray, target: np.ndarray, patient_id: 
 
     width = int(np.ceil(np.sqrt(len(preds))))
     grid = np.zeros((width, width), dtype=int)
-    cmap = colors.LinearSegmentedColormap.from_list("Custom", ["green", "white", "red"], N=10)
+    cmap = colors.LinearSegmentedColormap.from_list(
+        "Custom", ["green", "white", "red"], N=10
+    )
     fig, ax = plt.subplots()
     for i, (pid, error_bucket, tar) in enumerate(zipped):
         grid[i // width, i % width] = error_bucket
@@ -76,8 +81,10 @@ def segmentation_label_color(labels=[0, 1, 2, 3], cmap="mbas", rgb_255=True):
 def make_segmentation_legend(
     fig, fontsize=12, loc="upper left", bbox_to_anchor=(0.0, 0.0)
 ):
-    patches = [mpatches.Patch(color=MBAS_LABEL_COLORS[i], 
-                              label=f"({i}) {MBAS_LABELS[i]}") for i in [1, 2, 3]]
+    patches = [
+        mpatches.Patch(color=MBAS_LABEL_COLORS[i], label=f"({i}) {MBAS_LABELS[i]}")
+        for i in [1, 2, 3]
+    ]
     legend = fig.legend(
         handles=patches,
         loc=loc,
