@@ -19,6 +19,7 @@ def make_subject(
     folder_path: str,
     train_test_split: str = "train",
     extension: list[str] = [".nii", ".nii.gz"],
+    add_heirarchical=False,
 ) -> tio.Subject:
     # patient_id_str is formatted "MBAS_002"
     patient_id_str = os.path.basename(folder_path)
@@ -43,6 +44,17 @@ def make_subject(
         patient_id_str=patient_id_str,
         train_test_split=train_test_split,
     )
+    if add_heirarchical:
+        subject.add_image(
+            tio.LabelMap(
+                path=get_file_name(
+                    os.path.join(folder_path, f"{patient_id_str}_hierarchical_label"),
+                    extension,
+                ),
+                name="hierarchical_label",
+            ),
+            "hierarchical_label",
+        )
     return subject
 
 

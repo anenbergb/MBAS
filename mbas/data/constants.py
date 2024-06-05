@@ -25,3 +25,18 @@ MBAS_LABELS = OrderedDict(
 )
 
 MBAS_LABEL_COLORS = OrderedDict({0: "black", 1: "yellow", 2: "red", 3: "blue"})
+
+
+MBAS_HIERARCHICAL_LABELS = OrderedDict(
+    {
+        0: "Background",
+        1: "Left Atrium Wall",
+        2: "Right Atrium Cavity",
+        3: "Left Atrium Cavity",
+        4: "Right Atrium Wall",
+    }
+)
+
+MBAS_HIERARCHICAL_LABEL_COLORS = OrderedDict(
+    {0: "black", 1: "yellow", 2: "red", 3: "blue", 4: "green"}
+)
