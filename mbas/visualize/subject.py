@@ -4,12 +4,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torchio as tio
 from matplotlib import font_manager
-from monai.visualize import blend_images
+
+# from monai.transforms.utils import rescale_array
 from PIL import Image, ImageDraw, ImageFont
 from torchio.transforms.preprocessing.spatial.to_canonical import ToCanonical
 from torchio.visualization import color_labels, rotate
 
-from .visualize import add_color_border, figure_to_array, make_segmentation_legend
+from .visualize import (
+    add_color_border,
+    figure_to_array,
+    make_segmentation_legend,
+    blend_images,
+)
 
 
 def plot_volume(
