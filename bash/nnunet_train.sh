@@ -29,8 +29,14 @@ export nnUNet_n_proc_DA=4
 # nnUNetv2_train 101 3d_fullres 3 --val -tr nnUNetTrainer_250epochs
 # nnUNetv2_train 101 3d_fullres 4 --val -tr nnUNetTrainer_250epochs
 
-nnUNetv2_train 101 2d 0 --npz -tr nnUNetTrainer_250epochs -p nnUNetResEncUNetMPlans
-nnUNetv2_train 101 2d 1 --npz -tr nnUNetTrainer_250epochs -p nnUNetResEncUNetMPlans
-nnUNetv2_train 101 2d 2 --npz -tr nnUNetTrainer_250epochs -p nnUNetResEncUNetMPlans
-nnUNetv2_train 101 2d 3 --npz -tr nnUNetTrainer_250epochs -p nnUNetResEncUNetMPlans
-nnUNetv2_train 101 2d 4 --npz -tr nnUNetTrainer_250epochs -p nnUNetResEncUNetMPlans
+# nnUNetv2_train 101 2d 0 --npz -tr nnUNetTrainer_250epochs -p nnUNetResEncUNetMPlans
+# nnUNetv2_train 101 2d 1 --npz -tr nnUNetTrainer_250epochs -p nnUNetResEncUNetMPlans
+# nnUNetv2_train 101 2d 2 --npz -tr nnUNetTrainer_250epochs -p nnUNetResEncUNetMPlans
+# nnUNetv2_train 101 2d 3 --npz -tr nnUNetTrainer_250epochs -p nnUNetResEncUNetMPlans
+# nnUNetv2_train 101 2d 4 --npz -tr nnUNetTrainer_250epochs -p nnUNetResEncUNetMPlans
+
+nnUNetv2_train 101 3d_fullres 0 --npz -p nnUNetResEncUNetMPlans --val
+nnUNetv2_train 101 3d_fullres 1 --npz -p nnUNetResEncUNetMPlans
+nnUNetv2_train 101 3d_fullres 2 --npz -p nnUNetResEncUNetMPlans
+nnUNetv2_train 101 3d_fullres 3 --npz -p nnUNetResEncUNetMPlans
+nnUNetv2_train 101 3d_fullres 4 --npz -p nnUNetResEncUNetMPlans

@@ -10,7 +10,6 @@ from loguru import logger
 from tqdm import tqdm
 import numpy as np
 import torch
-from scipy.spatial.distance import cdist
 import torchio as tio
 
 from mbas.data.nifti import get_subject_folders, make_subject
@@ -24,10 +23,11 @@ def render_subject_videos(
 ):
 
     subject_folders = sorted(get_subject_folders(data_dir))
+    logger.info(f"Rendering videos for {len(subject_folders)} subjects")
     for folder in tqdm(subject_folders[:3]):
         subject = make_subject(folder)
         video_filepath = os.path.join(folder, f"{axis}.mp4")
-        tio_image_to_video(subject.mri, video_filepath)
+        tio_image_to_video(subject.mri, video_filepath, axis=axis, framerate=framerate)
 
 
 def get_args() -> argparse.Namespace:

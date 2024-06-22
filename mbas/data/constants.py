@@ -24,6 +24,15 @@ MBAS_LABELS = OrderedDict(
     }
 )
 
+MBAS_SHORT_LABELS = OrderedDict(
+    {
+        0: "background",
+        1: "wall",
+        2: "right",
+        3: "left",
+    }
+)
+
 MBAS_LABEL_COLORS = OrderedDict({0: "black", 1: "yellow", 2: "blue", 3: "red"})
 
 
