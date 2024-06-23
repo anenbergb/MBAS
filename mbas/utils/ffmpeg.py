@@ -2,6 +2,7 @@ import io
 
 import ffmpeg
 import matplotlib
+import matplotlib.pyplot
 import numpy as np
 
 
@@ -27,6 +28,7 @@ class FfmpegWriter:
         framerate=30,
         vcodec="libx264",
         crf=20,
+        pix_fmt="rgb24",  # gray
     ):
         self.width = width
         self.height = height
@@ -35,7 +37,7 @@ class FfmpegWriter:
                 "pipe:",
                 r=framerate,
                 format="rawvideo",
-                pix_fmt="rgb24",
+                pix_fmt=pix_fmt,
                 s=f"{width}x{height}",
             )
             .output(save_path, vcodec=vcodec, pix_fmt="yuv420p", crf=crf)
@@ -48,7 +50,7 @@ class FfmpegWriter:
             image = figure_to_array(image)
 
         assert isinstance(image, np.ndarray)
-        buffer = image.astype(np.uint8).tobytes()
+        buffer = image.astype(np.uint8).tobytes(order="C")
         self.process.stdin.write(buffer)
 
     def close(self):

@@ -46,7 +46,6 @@ def plot_volume(
         axes = axes.flatten()
 
     # sag_axis, cor_axis, axi_axis = axes
-
     if reorient:
         image = ToCanonical()(image)  # type: ignore[assignment]
     data = image.data[channel]

@@ -24,7 +24,7 @@ def render_subject_videos(
 
     subject_folders = sorted(get_subject_folders(data_dir))
     logger.info(f"Rendering videos for {len(subject_folders)} subjects")
-    for folder in tqdm(subject_folders[:3]):
+    for folder in tqdm(subject_folders):
         subject = make_subject(folder)
         video_filepath = os.path.join(folder, f"{axis}.mp4")
         tio_image_to_video(subject.mri, video_filepath, axis=axis, framerate=framerate)
@@ -46,7 +46,7 @@ Render video for each subject
         "--axis",
         type=str,
         choices=("sagittal", "coronal", "axial"),
-        default=10,
+        default="axial",
     )
     parser.add_argument(
         "--framerate",
