@@ -30,20 +30,25 @@ def make_subject(
         ),
         name="mri",
     )
-    label = tio.LabelMap(
-        path=get_file_name(
-            os.path.join(folder_path, f"{patient_id_str}_label"), extension
-        ),
-        name="label",
-    )
 
     subject = tio.Subject(
         mri=mri,
-        label=label,
         patient_id=patient_id,
         patient_id_str=patient_id_str,
         train_test_split=train_test_split,
     )
+    label_path = get_file_name(
+        os.path.join(folder_path, f"{patient_id_str}_label"), extension
+    )
+    if label_path is not None and os.path.exists(label_path):
+        subject.add_image(
+            tio.LabelMap(
+                path=label_path,
+                name="label",
+            ),
+            "label",
+        )
+
     if add_heirarchical:
         subject.add_image(
             tio.LabelMap(
