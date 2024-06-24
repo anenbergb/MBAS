@@ -13,9 +13,62 @@ import torch
 import torchio as tio
 
 import fiftyone as fo
-import fiftyone.zoo as foz
 
+from torchio.transforms.preprocessing.spatial.to_canonical import ToCanonical
+from torchio.visualization import rotate
 from mbas.data.nifti import get_subject_folders, make_subject
+from mbas.data.constants import MBAS_LABELS
+
+
+def fiftyone_segmentations(
+    label_map,
+    axis="axial",  # one of (Sagittal, Coronal, Axial
+):
+    axes_names = ["sagittal", "coronal", "axial"]
+    assert axis in axes_names
+    axes_index = axes_names.index(axis)
+
+    image = ToCanonical()(label_map)  # type: ignore[assignment]
+    # [1, 640, 640, 44] -> [640, 640, 44]
+    data = image.data[-1]
+    dim_max = data.shape[axes_index]
+
+    segmentations = []
+    for i in range(dim_max):
+        if axes_index == 0:
+            data_slice = data[i, :, :]
+        elif axes_index == 1:
+            data_slice = data[:, i, :]
+        else:
+            data_slice = data[:, :, i]
+        rot_slice = rotate(data_slice, radiological=True)
+        rot_slice = np.flipud(rot_slice)  # equivalent to origin = "lower"
+        rot_slice = np.fliplr(rot_slice)  # equivalent to invert_xaxis
+        seg = fo.Segmentation(mask=rot_slice)
+        segmentations.append(seg)
+    return segmentations
+
+
+def add_segmentation_to_sample(
+    sample,
+    file_path,
+    segmentation_key="ground_truth",
+):
+    if not os.path.exists(file_path):
+        return
+    image = tio.LabelMap(path=file_path)
+    segmentations = fiftyone_segmentations(image, axis="axial")
+
+    # Ensure the sample has a frames attribute initialized
+    if not sample.frames:
+        sample.frames = {}
+
+    for i, segmentation in enumerate(segmentations, start=1):
+        # Assuming frame numbering starts at 1
+        # Get existing frame or create a new one
+        frame = sample.frames[i] = fo.Frame()
+        frame[segmentation_key] = segmentation  # Assign the segmentation to the frame
+        sample.frames[i] = frame  # Update the sample's frames dictionary
 
 
 def launch_fiftyone_app(dataset):
@@ -38,6 +91,9 @@ def create_samples(subject_folders, train_test_split="train"):
         sample["patient_id"] = patient_id
         sample["split"] = train_test_split
 
+        gt_path = os.path.join(subject_folder, f"{patient_id_str}_label.nii.gz")
+        add_segmentation_to_sample(sample, gt_path, "ground_truth")
+
         # Add custom fields if necessary, e.g., labels or metadata
         # sample["metadata"] = fo.Metadata()  # Example for adding metadata
         # Add the sample to the dataset
@@ -55,6 +111,7 @@ def launch_fiftyone(
         val_folders, "validation"
     )
     dataset = fo.Dataset(dataset_name)
+    dataset.default_mask_targets = MBAS_LABELS
     dataset.add_samples(samples)
     launch_fiftyone_app(dataset)
 
