@@ -17,7 +17,32 @@ import fiftyone as fo
 from torchio.transforms.preprocessing.spatial.to_canonical import ToCanonical
 from torchio.visualization import rotate
 from mbas.data.nifti import get_subject_folders, make_subject
-from mbas.data.constants import MBAS_LABELS
+from mbas.data.constants import MBAS_LABELS, MBAS_LABEL_COLORS
+
+
+def make_color_scheme():
+    # https://www.rapidtables.com/web/color/RGB_Color.html
+    return fo.ColorScheme(
+        color_by="value",
+        opacity=0.25,
+        default_mask_targets_colors=[
+            {"intTarget": 1, "color": "yellow"},
+            {"intTarget": 2, "color": "blue"},
+            {"intTarget": 3, "color": "red"},
+        ],
+        fields=[
+            {
+                "path": "frames.ground_truth",
+                "fieldColor": "blue",
+                "colorByAttribute": "value",
+                "maskTargetsColors": [
+                    {"intTarget": 1, "color": "#80FF00"},  # green
+                    {"intTarget": 2, "color": "#7F00FF"},  # purple
+                    {"intTarget": 3, "color": "#FF8000"},  # orange
+                ],
+            }
+        ],
+    )
 
 
 def fiftyone_segmentations(
@@ -72,8 +97,9 @@ def add_segmentation_to_sample(
 
 
 def launch_fiftyone_app(dataset):
+    color_scheme = make_color_scheme()
     # Launch the FiftyOne app
-    session = fo.launch_app(dataset)
+    session = fo.launch_app(dataset, color_scheme=color_scheme)
     session.wait()
 
 
@@ -110,6 +136,7 @@ def launch_fiftyone(
     samples = create_samples(train_folders, "train") + create_samples(
         val_folders, "validation"
     )
+    samples = samples[:5]
     dataset = fo.Dataset(dataset_name)
     dataset.default_mask_targets = MBAS_LABELS
     dataset.add_samples(samples)
