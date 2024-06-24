@@ -24,7 +24,7 @@ def make_color_scheme(predictions_name="predictions"):
     # https://www.rapidtables.com/web/color/RGB_Color.html
     return fo.ColorScheme(
         color_by="value",
-        opacity=0.25,
+        opacity=0.35,
         default_mask_targets_colors=[
             {"intTarget": 1, "color": "yellow"},
             {"intTarget": 2, "color": "blue"},
@@ -43,7 +43,7 @@ def make_color_scheme(predictions_name="predictions"):
             },
             {
                 "path": f"frames.{predictions_name}",
-                "fieldColor": "purple",
+                "fieldColor": "#7F00FF",
                 "colorByAttribute": "value",
                 "maskTargetsColors": [
                     {"intTarget": 1, "color": "#80FF00"},  # green
