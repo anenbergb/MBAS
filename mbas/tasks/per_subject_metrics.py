@@ -53,8 +53,8 @@ def per_subject_metrics(train_dir, results_dir, save_filepath):
         metrics_dict.append(mdict)
 
     df = pd.DataFrame.from_records(metrics_dict)
-    os.makedirs(os.path.dirname(args.save), exist_ok=True)
-    df.to_pickle(args.save)
+    os.makedirs(os.path.dirname(save_filepath), exist_ok=True)
+    df.to_pickle(save_filepath)
 
 
 def get_args() -> argparse.Namespace:

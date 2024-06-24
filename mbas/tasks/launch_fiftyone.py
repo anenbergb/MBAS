@@ -20,7 +20,7 @@ from mbas.data.nifti import get_subject_folders, make_subject
 from mbas.data.constants import MBAS_LABELS, MBAS_LABEL_COLORS
 
 
-def make_color_scheme():
+def make_color_scheme(predictions_name="predictions"):
     # https://www.rapidtables.com/web/color/RGB_Color.html
     return fo.ColorScheme(
         color_by="value",
@@ -36,11 +36,21 @@ def make_color_scheme():
                 "fieldColor": "blue",
                 "colorByAttribute": "value",
                 "maskTargetsColors": [
+                    {"intTarget": 1, "color": "yellow"},
+                    {"intTarget": 2, "color": "blue"},
+                    {"intTarget": 3, "color": "red"},
+                ],
+            },
+            {
+                "path": f"frames.{predictions_name}",
+                "fieldColor": "purple",
+                "colorByAttribute": "value",
+                "maskTargetsColors": [
                     {"intTarget": 1, "color": "#80FF00"},  # green
                     {"intTarget": 2, "color": "#7F00FF"},  # purple
                     {"intTarget": 3, "color": "#FF8000"},  # orange
                 ],
-            }
+            },
         ],
     )
 
@@ -90,14 +100,10 @@ def add_segmentation_to_sample(
 
     for i, segmentation in enumerate(segmentations, start=1):
         # Assuming frame numbering starts at 1
-        # Get existing frame or create a new one
-        frame = sample.frames[i] = fo.Frame()
-        frame[segmentation_key] = segmentation  # Assign the segmentation to the frame
-        sample.frames[i] = frame  # Update the sample's frames dictionary
+        sample.frames[i][segmentation_key] = segmentation
 
 
-def launch_fiftyone_app(dataset):
-    color_scheme = make_color_scheme()
+def launch_fiftyone_app(dataset, color_scheme):
     # Launch the FiftyOne app
     session = fo.launch_app(dataset, color_scheme=color_scheme)
     session.wait()
@@ -127,20 +133,37 @@ def create_samples(subject_folders, train_test_split="train"):
     return samples
 
 
+def add_predictions_to_samples(
+    samples, predictions_dir, predictions_name="predictions"
+):
+    for sample in samples:
+        patient_id_str = sample["patient_id_str"]
+        predictions_file = os.path.join(predictions_dir, f"{patient_id_str}.nii.gz")
+        if os.path.exists(predictions_file):
+            add_segmentation_to_sample(sample, predictions_file, predictions_name)
+
+    return samples
+
+
 def launch_fiftyone(
     data_dir,
     dataset_name,
+    predictions_dir=None,
+    predictions_name=None,
 ):
     train_folders = sorted(get_subject_folders(os.path.join(data_dir, "Training")))
     val_folders = sorted(get_subject_folders(os.path.join(data_dir, "Validation")))
-    samples = create_samples(train_folders, "train") + create_samples(
-        val_folders, "validation"
-    )
-    samples = samples[:5]
+    samples = create_samples(train_folders, "train")
+    samples += create_samples(val_folders, "validation")
+    if predictions_dir:
+        samples = add_predictions_to_samples(samples, predictions_dir, predictions_name)
+
+    # samples = samples[:5]
     dataset = fo.Dataset(dataset_name)
     dataset.default_mask_targets = MBAS_LABELS
     dataset.add_samples(samples)
-    launch_fiftyone_app(dataset)
+    color_scheme = make_color_scheme(predictions_name)
+    launch_fiftyone_app(dataset, color_scheme)
 
 
 def get_args() -> argparse.Namespace:
@@ -160,9 +183,26 @@ Render video for each subject
         default="mbas_videos",
         type=str,
     )
+    parser.add_argument(
+        "-p",
+        "--predictions-dir",
+        type=str,
+    )
+    parser.add_argument(
+        "--predictions-name",
+        type=str,
+        default="predictions",
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = get_args()
-    sys.exit(launch_fiftyone(args.data_dir, args.dataset_name))
+    sys.exit(
+        launch_fiftyone(
+            args.data_dir,
+            args.dataset_name,
+            args.predictions_dir,
+            args.predictions_name,
+        )
+    )
