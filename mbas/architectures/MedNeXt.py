@@ -370,50 +370,73 @@ class MedNeXt(nn.Module):
 class MedNeXtEncoder(nn.Module):
     def __init__(
         self,
-        input_channels: int,
         n_stages: int,
-        block_counts: List[int],
-        exp_ratios: List[int],
+        features_per_stage: List[int],
         conv_op: Type[_ConvNd],
-        kernel_size: int = 7,
+        kernel_size: int,
+        # strides
+        n_blocks_per_stage: List[int],
+        exp_ratio_per_stage: List[int],
+        return_skips: bool = False,
+        # TODO: refactor these arguments
         do_res: bool = False,  # Can be used to individually test residual connection
         do_res_up_down: bool = False,  # Additional 'res' connection on up and down convs
         norm_type="group",
         grn=False,
         dim="3d",  # 2d or 3d
     ):
+        """
+        # NOTE: Encoder does not include the stem
+
+        n_stages: 5
+        features_per_stage: [32, 64, 128, 256, 512]
+        conv_op: nn.Conv3d
+        kernel_size: 7
+        n_blocks_per_stage: [2, 2, 2, 2, 2]
+        exp_ratio_per_stage: [2, 3, 4, 4, 4]
+        return_skips: True
+
+
+        """
         super().__init__()
-        assert len(block_counts) == n_stages
-        assert len(exp_ratios) == n_stages
+
+        assert (
+            len(features_per_stage) == n_stages
+        ), "features_per_stage must have as many entries as we have resolution stages (n_stages)"
+        assert (
+            len(n_blocks_per_stage) == n_stages
+        ), "n_blocks_per_stage must have as many entries as we have resolution stages (n_stages)"
+        assert (
+            len(exp_ratio_per_stage) == n_stages
+        ), "exp_ratio_per_stage must have as many entries as we have resolution stages (n_stages)"
 
         self.stages = nn.ModuleList()
         self.down_blocks = nn.ModuleList()
         for i in range(n_stages):
-            channels = input_channels * 2**i
             stage = nn.Sequential(
                 *[
                     MedNeXtBlock(
-                        in_channels=channels,
-                        out_channels=channels,
+                        in_channels=features_per_stage[i],
+                        out_channels=features_per_stage[i],
                         conv_op=conv_op,
-                        exp_r=exp_ratios[i],
+                        exp_r=exp_ratio_per_stage[i],
                         kernel_size=kernel_size,
                         do_res=do_res,
                         norm_type=norm_type,
-                        dim=dim,
                         grn=grn,
+                        dim=dim,
                     )
-                    for _ in range(block_counts[i])
+                    for _ in range(n_blocks_per_stage[i])
                 ]
             )
             self.stages.append(stage)
             if i < n_stages - 1:
                 self.down_blocks.append(
                     MedNeXtDownBlock(
-                        in_channels=channels,
-                        out_channels=2 * channels,
+                        in_channels=features_per_stage[i],
+                        out_channels=features_per_stage[i + 1],
                         conv_op=conv_op,
-                        exp_r=exp_ratios[i + 1],
+                        exp_r=exp_ratio_per_stage[i + 1],
                         kernel_size=kernel_size,
                         do_res=do_res_up_down,
                         norm_type=norm_type,
@@ -422,6 +445,18 @@ class MedNeXtEncoder(nn.Module):
                     )
                 )
 
+        self.output_channels = features_per_stage
+        self.return_skips = return_skips
+
+        # we store some things that a potential decoder needs
+        self.conv_op = conv_op
+        self.kernel_size = kernel_size
+        self.do_res = do_res
+        self.do_res_up_down = do_res_up_down
+        self.norm_type = norm_type
+        self.grn = grn
+        self.dim = dim
+
     def forward(self, x):
         features = []
         for i, stage in enumerate(self.stages):
@@ -429,18 +464,24 @@ class MedNeXtEncoder(nn.Module):
             features.append(x)
             if i < len(self.down_blocks):
                 x = self.down_blocks[i](x)
-        return x, features
+        if self.return_skips:
+            return features
+        else:
+            return features[-1]
 
 
 class MedNeXtDecoder(nn.Module):
     def __init__(
         self,
-        input_channels: int,
-        n_stages: int,
-        block_counts: List[int],
-        exp_ratios: List[int],
-        conv_op: Type[_ConvNd],
-        kernel_size: int = 7,
+        encoder: MedNeXtEncoder,
+        num_classes: int,
+        n_blocks_per_stage: List[int],
+        deep_supervision: bool = True,
+        # input_channels: int,
+        # n_stages: int,
+        # exp_ratios: List[int],
+        # conv_op: Type[_ConvNd],
+        # kernel_size: int = 7,
         do_res: bool = False,  # Can be used to individually test residual connection
         do_res_up_down: bool = False,  # Additional 'res' connection on up and down convs
         norm_type="group",
@@ -463,11 +504,23 @@ class MedNeXtDecoder(nn.Module):
         :param deep_supervision:
         """
         super().__init__()
-        assert len(block_counts) == n_stages
+        self.deep_supervision = deep_supervision
+        self.encoder = encoder
+        self.num_classes = num_classes
+        n_stages_encoder = len(encoder.output_channels)
+
+        assert len(n_blocks_per_stage) == n_stages
         assert len(exp_ratios) == n_stages
+
+        assert len(n_conv_per_stage) == n_stages_encoder - 1, (
+            "n_conv_per_stage must have as many entries as we have "
+            "resolution stages - 1 (n_stages in encoder - 1), "
+            "here: %d" % n_stages_encoder
+        )
 
         self.stages = nn.ModuleList()
         self.up_blocks = nn.ModuleList()
+        self.seg_layers = nn.ModuleList()
         for i in range(n_stages):
             channels = input_channels // (2**i)
             self.up_blocks.append(
@@ -500,6 +553,12 @@ class MedNeXtDecoder(nn.Module):
                 ]
             )
             self.stages.append(stage)
+            # we always build the deep supervision outputs so that we can always load parameters. If we don't do this
+            # then a model trained with deep_supervision=True could not easily be loaded at inference time where
+            # deep supervision is not needed. It's just a convenience thing
+            self.seg_layers.append(
+                encoder.conv_op(input_features_skip, num_classes, 1, 1, 0, bias=True)
+            )
 
     def forward(self, x):
         features = []
