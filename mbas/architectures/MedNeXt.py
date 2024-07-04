@@ -14,347 +14,76 @@ class MedNeXt(nn.Module):
     def __init__(
         self,
         input_channels: int,
-        n_channels: int,
-        num_classes: int,
-        conv_op: Type[_ConvNd],
-        exp_r: int = 4,  # Expansion ratio as in Swin Transformers
+        n_stages: int = 5,
+        features_per_stage: List[int] = [32, 64, 128, 256, 512],
+        conv_op: Type[_ConvNd] = nn.Conv3d,
         kernel_size: int = 7,
-        enc_kernel_size: int = None,
-        dec_kernel_size: int = None,
-        deep_supervision: bool = False,  # Can be used to test deep supervision
+        # strides
+        n_blocks_per_stage: List[int] = [3, 4, 8, 8, 8],
+        exp_ratio_per_stage: List[int] = [2, 3, 4, 4, 4],
+        num_classes: int = 3,
+        n_blocks_per_stage_decoder: List[int] = [8, 8, 4, 3],
+        exp_ratio_per_stage_decoder: List[int] = [4, 4, 3, 2],
+        deep_supervision: bool = False,
+        # TODO: refactor these arguments
         do_res: bool = False,  # Can be used to individually test residual connection
         do_res_up_down: bool = False,  # Additional 'res' connection on up and down convs
-        block_counts: list = [
-            2,
-            2,
-            2,
-            2,
-            2,
-            2,
-            2,
-            2,
-            2,
-        ],  # Can be used to test staging ratio:
-        # [3,3,9,3] in Swin as opposed to [2,2,2,2,2] in nnUNet
         norm_type="group",
-        dim="3d",  # 2d or 3d
         grn=False,
+        dim="3d",  # 2d or 3d
     ):
+        """
+
+        EXPERIMENT:
+            - try differnet kernel sizes for encoder and decoder
+        """
 
         super().__init__()
+        assert len(n_blocks_per_stage) == n_stages, (
+            "n_blocks_per_stage must have as many entries as we have "
+            f"resolution stages. here: {n_stages}. "
+            f"n_blocks_per_stage: {n_blocks_per_stage}"
+        )
+        assert len(exp_ratio_per_stage) == n_stages
+        assert len(n_blocks_per_stage_decoder) == (n_stages - 1), (
+            "n_blocks_per_stage_decoder must have one less entries "
+            f"as we have resolution stages. here: {n_stages} "
+            f"stages, so it should have {n_stages - 1} entries. "
+            f"n_blocks_per_stage_decoder: {n_blocks_per_stage_decoder}"
+        )
+        assert len(exp_ratio_per_stage_decoder) == (n_stages - 1)
 
-        self.do_ds = deep_supervision
         assert dim in ["2d", "3d"]
 
-        if kernel_size is not None:
-            enc_kernel_size = kernel_size
-            dec_kernel_size = kernel_size
+        self.stem = conv_op(input_channels, features_per_stage[0], kernel_size=1)
 
-        self.stem = conv_op(input_channels, n_channels, kernel_size=1)
-        if isinstance(exp_r, int):
-            exp_r = [exp_r for i in range(len(block_counts))]
-
-        self.enc_block_0 = nn.Sequential(
-            *[
-                MedNeXtBlock(
-                    in_channels=n_channels,
-                    out_channels=n_channels,
-                    exp_r=exp_r[0],
-                    kernel_size=enc_kernel_size,
-                    do_res=do_res,
-                    norm_type=norm_type,
-                    dim=dim,
-                    grn=grn,
-                )
-                for i in range(block_counts[0])
-            ]
-        )
-
-        self.down_0 = MedNeXtDownBlock(
-            in_channels=n_channels,
-            out_channels=2 * n_channels,
-            exp_r=exp_r[1],
-            kernel_size=enc_kernel_size,
-            do_res=do_res_up_down,
+        self.encoder = MedNeXtEncoder(
+            n_stages=n_stages,
+            features_per_stage=features_per_stage,
+            conv_op=conv_op,
+            kernel_size=kernel_size,
+            n_blocks_per_stage=n_blocks_per_stage,
+            exp_ratio_per_stage=exp_ratio_per_stage,
+            return_skips=True,
+            do_res=do_res,
+            do_res_up_down=do_res_up_down,
             norm_type=norm_type,
-            dim=dim,
-        )
-
-        self.enc_block_1 = nn.Sequential(
-            *[
-                MedNeXtBlock(
-                    in_channels=n_channels * 2,
-                    out_channels=n_channels * 2,
-                    exp_r=exp_r[1],
-                    kernel_size=enc_kernel_size,
-                    do_res=do_res,
-                    norm_type=norm_type,
-                    dim=dim,
-                    grn=grn,
-                )
-                for i in range(block_counts[1])
-            ]
-        )
-
-        self.down_1 = MedNeXtDownBlock(
-            in_channels=2 * n_channels,
-            out_channels=4 * n_channels,
-            exp_r=exp_r[2],
-            kernel_size=enc_kernel_size,
-            do_res=do_res_up_down,
-            norm_type=norm_type,
-            dim=dim,
             grn=grn,
-        )
-
-        self.enc_block_2 = nn.Sequential(
-            *[
-                MedNeXtBlock(
-                    in_channels=n_channels * 4,
-                    out_channels=n_channels * 4,
-                    exp_r=exp_r[2],
-                    kernel_size=enc_kernel_size,
-                    do_res=do_res,
-                    norm_type=norm_type,
-                    dim=dim,
-                    grn=grn,
-                )
-                for i in range(block_counts[2])
-            ]
-        )
-
-        self.down_2 = MedNeXtDownBlock(
-            in_channels=4 * n_channels,
-            out_channels=8 * n_channels,
-            exp_r=exp_r[3],
-            kernel_size=enc_kernel_size,
-            do_res=do_res_up_down,
-            norm_type=norm_type,
             dim=dim,
-            grn=grn,
         )
-
-        self.enc_block_3 = nn.Sequential(
-            *[
-                MedNeXtBlock(
-                    in_channels=n_channels * 8,
-                    out_channels=n_channels * 8,
-                    exp_r=exp_r[3],
-                    kernel_size=enc_kernel_size,
-                    do_res=do_res,
-                    norm_type=norm_type,
-                    dim=dim,
-                    grn=grn,
-                )
-                for i in range(block_counts[3])
-            ]
+        self.decoder = MedNeXtDecoder(
+            encoder=self.encoder,
+            num_classes=num_classes,
+            n_blocks_per_stage=n_blocks_per_stage_decoder,
+            exp_ratio_per_stage=exp_ratio_per_stage_decoder,
+            deep_supervision=deep_supervision,
         )
-
-        self.down_3 = MedNeXtDownBlock(
-            in_channels=8 * n_channels,
-            out_channels=16 * n_channels,
-            exp_r=exp_r[4],
-            kernel_size=enc_kernel_size,
-            do_res=do_res_up_down,
-            norm_type=norm_type,
-            dim=dim,
-            grn=grn,
-        )
-
-        self.bottleneck = nn.Sequential(
-            *[
-                MedNeXtBlock(
-                    in_channels=n_channels * 16,
-                    out_channels=n_channels * 16,
-                    exp_r=exp_r[4],
-                    kernel_size=dec_kernel_size,
-                    do_res=do_res,
-                    norm_type=norm_type,
-                    dim=dim,
-                    grn=grn,
-                )
-                for i in range(block_counts[4])
-            ]
-        )
-
-        self.up_3 = MedNeXtUpBlock(
-            in_channels=16 * n_channels,
-            out_channels=8 * n_channels,
-            exp_r=exp_r[5],
-            kernel_size=dec_kernel_size,
-            do_res=do_res_up_down,
-            norm_type=norm_type,
-            dim=dim,
-            grn=grn,
-        )
-
-        self.dec_block_3 = nn.Sequential(
-            *[
-                MedNeXtBlock(
-                    in_channels=n_channels * 8,
-                    out_channels=n_channels * 8,
-                    exp_r=exp_r[5],
-                    kernel_size=dec_kernel_size,
-                    do_res=do_res,
-                    norm_type=norm_type,
-                    dim=dim,
-                    grn=grn,
-                )
-                for i in range(block_counts[5])
-            ]
-        )
-
-        self.up_2 = MedNeXtUpBlock(
-            in_channels=8 * n_channels,
-            out_channels=4 * n_channels,
-            exp_r=exp_r[6],
-            kernel_size=dec_kernel_size,
-            do_res=do_res_up_down,
-            norm_type=norm_type,
-            dim=dim,
-            grn=grn,
-        )
-
-        self.dec_block_2 = nn.Sequential(
-            *[
-                MedNeXtBlock(
-                    in_channels=n_channels * 4,
-                    out_channels=n_channels * 4,
-                    exp_r=exp_r[6],
-                    kernel_size=dec_kernel_size,
-                    do_res=do_res,
-                    norm_type=norm_type,
-                    dim=dim,
-                    grn=grn,
-                )
-                for i in range(block_counts[6])
-            ]
-        )
-
-        self.up_1 = MedNeXtUpBlock(
-            in_channels=4 * n_channels,
-            out_channels=2 * n_channels,
-            exp_r=exp_r[7],
-            kernel_size=dec_kernel_size,
-            do_res=do_res_up_down,
-            norm_type=norm_type,
-            dim=dim,
-            grn=grn,
-        )
-
-        self.dec_block_1 = nn.Sequential(
-            *[
-                MedNeXtBlock(
-                    in_channels=n_channels * 2,
-                    out_channels=n_channels * 2,
-                    exp_r=exp_r[7],
-                    kernel_size=dec_kernel_size,
-                    do_res=do_res,
-                    norm_type=norm_type,
-                    dim=dim,
-                    grn=grn,
-                )
-                for i in range(block_counts[7])
-            ]
-        )
-
-        self.up_0 = MedNeXtUpBlock(
-            in_channels=2 * n_channels,
-            out_channels=n_channels,
-            exp_r=exp_r[8],
-            kernel_size=dec_kernel_size,
-            do_res=do_res_up_down,
-            norm_type=norm_type,
-            dim=dim,
-            grn=grn,
-        )
-
-        self.dec_block_0 = nn.Sequential(
-            *[
-                MedNeXtBlock(
-                    in_channels=n_channels,
-                    out_channels=n_channels,
-                    exp_r=exp_r[8],
-                    kernel_size=dec_kernel_size,
-                    do_res=do_res,
-                    norm_type=norm_type,
-                    dim=dim,
-                    grn=grn,
-                )
-                for i in range(block_counts[8])
-            ]
-        )
-
-        self.out_0 = OutBlock(in_channels=n_channels, num_classes=num_classes, dim=dim)
-
         # Used to fix PyTorch checkpointing bug
-        self.dummy_tensor = nn.Parameter(torch.tensor([1.0]), requires_grad=True)
-
-        if deep_supervision:
-            self.out_1 = OutBlock(
-                in_channels=n_channels * 2, num_classes=num_classes, dim=dim
-            )
-            self.out_2 = OutBlock(
-                in_channels=n_channels * 4, num_classes=num_classes, dim=dim
-            )
-            self.out_3 = OutBlock(
-                in_channels=n_channels * 8, num_classes=num_classes, dim=dim
-            )
-            self.out_4 = OutBlock(
-                in_channels=n_channels * 16, num_classes=num_classes, dim=dim
-            )
-
-        self.block_counts = block_counts
+        # self.dummy_tensor = nn.Parameter(torch.tensor([1.0]), requires_grad=True)
 
     def forward(self, x):
-
-        x = self.stem(x)
-        x_res_0 = self.enc_block_0(x)
-        x = self.down_0(x_res_0)
-        x_res_1 = self.enc_block_1(x)
-        x = self.down_1(x_res_1)
-        x_res_2 = self.enc_block_2(x)
-        x = self.down_2(x_res_2)
-        x_res_3 = self.enc_block_3(x)
-        x = self.down_3(x_res_3)
-
-        x = self.bottleneck(x)
-        if self.do_ds:
-            x_ds_4 = self.out_4(x)
-
-        x_up_3 = self.up_3(x)
-        dec_x = x_res_3 + x_up_3
-        x = self.dec_block_3(dec_x)
-
-        if self.do_ds:
-            x_ds_3 = self.out_3(x)
-        del x_res_3, x_up_3
-
-        x_up_2 = self.up_2(x)
-        dec_x = x_res_2 + x_up_2
-        x = self.dec_block_2(dec_x)
-        if self.do_ds:
-            x_ds_2 = self.out_2(x)
-        del x_res_2, x_up_2
-
-        x_up_1 = self.up_1(x)
-        dec_x = x_res_1 + x_up_1
-        x = self.dec_block_1(dec_x)
-        if self.do_ds:
-            x_ds_1 = self.out_1(x)
-        del x_res_1, x_up_1
-
-        x_up_0 = self.up_0(x)
-        dec_x = x_res_0 + x_up_0
-        x = self.dec_block_0(dec_x)
-        del x_res_0, x_up_0, dec_x
-
-        x = self.out_0(x)
-
-        if self.do_ds:
-            return [x, x_ds_1, x_ds_2, x_ds_3, x_ds_4]
-        else:
-            return x
+        skips = self.encoder(x)
+        return self.decoder(skips)
 
     def compute_conv_feature_map_size(self, input_size):
         assert len(input_size) == convert_conv_op_to_dim(self.encoder.conv_op), (
@@ -386,7 +115,7 @@ class MedNeXtEncoder(nn.Module):
         dim="3d",  # 2d or 3d
     ):
         """
-        # NOTE: Encoder does not include the stem
+        NOTE: Encoder does not include the stem
 
         n_stages: 5
         features_per_stage: [32, 64, 128, 256, 512]
