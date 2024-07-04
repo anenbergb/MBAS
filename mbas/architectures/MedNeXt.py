@@ -17,7 +17,7 @@ class MedNeXt(nn.Module):
         n_stages: int = 5,
         features_per_stage: List[int] = [32, 64, 128, 256, 512],
         conv_op: Type[_ConvNd] = nn.Conv3d,
-        kernel_size: int = 7,
+        kernel_size: int = 3,
         # strides
         n_blocks_per_stage: List[int] = [3, 4, 8, 8, 8],
         exp_ratio_per_stage: List[int] = [2, 3, 4, 4, 4],
@@ -138,7 +138,7 @@ class MedNeXtEncoder(nn.Module):
                         in_channels=features_per_stage[i],
                         out_channels=features_per_stage[i],
                         conv_op=conv_op,
-                        exp_r=exp_ratio_per_stage[i],
+                        exp_ratio=exp_ratio_per_stage[i],
                         kernel_size=kernel_size,
                         norm_type=norm_type,
                         enable_affine_transform=enable_affine_transform,
@@ -153,7 +153,7 @@ class MedNeXtEncoder(nn.Module):
                         in_channels=features_per_stage[i],
                         out_channels=features_per_stage[i + 1],
                         conv_op=conv_op,
-                        exp_r=exp_ratio_per_stage[i + 1],
+                        exp_ratio=exp_ratio_per_stage[i + 1],
                         kernel_size=kernel_size,
                         norm_type=norm_type,
                         enable_affine_transform=enable_affine_transform,
@@ -219,7 +219,11 @@ class MedNeXtDecoder(nn.Module):
             "resolution stages - 1 (n_stages in encoder - 1), "
             "here: %d" % n_stages_encoder
         )
-        assert len(exp_ratio_per_stage) == n_blocks_per_stage
+        assert len(exp_ratio_per_stage) == n_stages_encoder - 1, (
+            "exp_ratio_per_stage must have as many entries as we have "
+            "resolution stages - 1 (n_stages in encoder - 1), "
+            "here: %d" % n_stages_encoder
+        )
 
         conv_op = encoder.conv_op
         kernel_size = encoder.kernel_size
@@ -252,7 +256,7 @@ class MedNeXtDecoder(nn.Module):
                     in_channels=input_features_below,
                     out_channels=input_features_skip,
                     conv_op=conv_op,
-                    exp_r=exp_ratio_per_stage[s - 1],
+                    exp_ratio=exp_ratio_per_stage[s - 1],
                     kernel_size=kernel_size,
                     norm_type=norm_type,
                     enable_affine_transform=enable_affine_transform,
@@ -264,7 +268,7 @@ class MedNeXtDecoder(nn.Module):
                         in_channels=input_features_skip,
                         out_channels=input_features_skip,
                         conv_op=conv_op,
-                        exp_r=exp_ratio_per_stage[s - 1],
+                        exp_ratio=exp_ratio_per_stage[s - 1],
                         kernel_size=kernel_size,
                         norm_type=norm_type,
                         enable_affine_transform=enable_affine_transform,
