@@ -25,12 +25,8 @@ class MedNeXt(nn.Module):
         n_blocks_per_stage_decoder: List[int] = [8, 8, 4, 3],
         exp_ratio_per_stage_decoder: List[int] = [4, 4, 3, 2],
         deep_supervision: bool = False,
-        # TODO: refactor these arguments
-        do_res: bool = False,  # Can be used to individually test residual connection
-        do_res_up_down: bool = False,  # Additional 'res' connection on up and down convs
-        norm_type="group",
-        grn=False,
-        dim="3d",  # 2d or 3d
+        norm_type: str = "group",
+        enable_affine_transform: bool = False,
     ):
         """
 
@@ -53,8 +49,6 @@ class MedNeXt(nn.Module):
         )
         assert len(exp_ratio_per_stage_decoder) == (n_stages - 1)
 
-        assert dim in ["2d", "3d"]
-
         self.stem = conv_op(input_channels, features_per_stage[0], kernel_size=1)
 
         self.encoder = MedNeXtEncoder(
@@ -65,11 +59,8 @@ class MedNeXt(nn.Module):
             n_blocks_per_stage=n_blocks_per_stage,
             exp_ratio_per_stage=exp_ratio_per_stage,
             return_skips=True,
-            do_res=do_res,
-            do_res_up_down=do_res_up_down,
             norm_type=norm_type,
-            grn=grn,
-            dim=dim,
+            enable_affine_transform=enable_affine_transform,
         )
         self.decoder = MedNeXtDecoder(
             encoder=self.encoder,
@@ -110,9 +101,8 @@ class MedNeXtEncoder(nn.Module):
         # TODO: refactor these arguments
         do_res: bool = False,  # Can be used to individually test residual connection
         do_res_up_down: bool = False,  # Additional 'res' connection on up and down convs
-        norm_type="group",
-        grn=False,
-        dim="3d",  # 2d or 3d
+        norm_type: str = "group",
+        enable_affine_transform: bool = False,
     ):
         """
         NOTE: Encoder does not include the stem
@@ -150,10 +140,8 @@ class MedNeXtEncoder(nn.Module):
                         conv_op=conv_op,
                         exp_r=exp_ratio_per_stage[i],
                         kernel_size=kernel_size,
-                        do_res=do_res,
                         norm_type=norm_type,
-                        grn=grn,
-                        dim=dim,
+                        enable_affine_transform=enable_affine_transform,
                     )
                     for _ in range(n_blocks_per_stage[i])
                 ]
@@ -167,10 +155,8 @@ class MedNeXtEncoder(nn.Module):
                         conv_op=conv_op,
                         exp_r=exp_ratio_per_stage[i + 1],
                         kernel_size=kernel_size,
-                        do_res=do_res_up_down,
                         norm_type=norm_type,
-                        dim=dim,
-                        grn=grn,
+                        enable_affine_transform=enable_affine_transform,
                     )
                 )
 
@@ -182,11 +168,8 @@ class MedNeXtEncoder(nn.Module):
         # we store some things that a potential decoder needs
         self.conv_op = conv_op
         self.kernel_size = kernel_size
-        self.do_res = do_res
-        self.do_res_up_down = do_res_up_down
         self.norm_type = norm_type
-        self.grn = grn
-        self.dim = dim
+        self.enable_affine_transform = enable_affine_transform
 
     def forward(self, x):
         features = []
@@ -240,11 +223,8 @@ class MedNeXtDecoder(nn.Module):
 
         conv_op = encoder.conv_op
         kernel_size = encoder.kernel_size
-        do_res = encoder.do_res
-        do_res_up_down = encoder.do_res_up_down
         norm_type = encoder.norm_type
-        grn = encoder.grn
-        dim = encoder.dim
+        enable_affine_transform = encoder.enable_affine_transform
 
         self.stages = nn.ModuleList()
         self.up_blocks = nn.ModuleList()
@@ -274,10 +254,8 @@ class MedNeXtDecoder(nn.Module):
                     conv_op=conv_op,
                     exp_r=exp_ratio_per_stage[s - 1],
                     kernel_size=kernel_size,
-                    do_res=do_res_up_down,
                     norm_type=norm_type,
-                    dim=dim,
-                    grn=grn,
+                    enable_affine_transform=enable_affine_transform,
                 )
             )
             stage = nn.Sequential(
@@ -288,10 +266,8 @@ class MedNeXtDecoder(nn.Module):
                         conv_op=conv_op,
                         exp_r=exp_ratio_per_stage[s - 1],
                         kernel_size=kernel_size,
-                        do_res=do_res,
                         norm_type=norm_type,
-                        dim=dim,
-                        grn=grn,
+                        enable_affine_transform=enable_affine_transform,
                     )
                     for _ in range(n_blocks_per_stage[s - 1])
                 ]
@@ -342,32 +318,8 @@ if __name__ == "__main__":
 
     network = MedNeXt(
         input_channels=1,
-        n_channels=32,
-        num_classes=13,
-        exp_r=[2, 3, 4, 4, 4, 4, 4, 3, 2],  # Expansion ratio as in Swin Transformers
-        # exp_r = 2,
-        kernel_size=3,  # Can test kernel_size
-        deep_supervision=True,  # Can be used to test deep supervision
-        do_res=True,  # Can be used to individually test residual connection
-        do_res_up_down=True,
-        # block_counts = [2,2,2,2,2,2,2,2,2],
-        block_counts=[3, 4, 8, 8, 8, 8, 8, 4, 3],
-        checkpoint_style=None,
-        dim="3d",
-        grn=True,
+        deep_supervision=True,
     ).cuda()
-
-    # network = MedNeXt_RegularUpDown(
-    #         input_channels = 1,
-    #         n_channels = 32,
-    #         num_classes = 13,
-    #         exp_r=[2,3,4,4,4,4,4,3,2],         # Expansion ratio as in Swin Transformers
-    #         kernel_size=3,                     # Can test kernel_size
-    #         deep_supervision=True,             # Can be used to test deep supervision
-    #         do_res=True,                      # Can be used to individually test residual connection
-    #         block_counts = [2,2,2,2,2,2,2,2,2],
-    #
-    #     ).cuda()
 
     def count_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -377,7 +329,6 @@ if __name__ == "__main__":
     from fvcore.nn import FlopCountAnalysis
     from fvcore.nn import parameter_count_table
 
-    # model = ResTranUnet(img_size=128, input_channels=1, num_classes=14, dummy=False).cuda()
     x = torch.zeros((1, 1, 64, 64, 64), requires_grad=False).cuda()
     flops = FlopCountAnalysis(network, x)
     print(flops.total())
