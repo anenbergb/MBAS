@@ -202,6 +202,9 @@ class MedNeXtUpBlock(MedNeXtBlock):
             x = torch.nn.functional.pad(x, (1, 0, 1, 0))
         elif self.conv_dim == 3:
             x = torch.nn.functional.pad(x, (1, 0, 1, 0, 1, 0))
+        else:
+            raise ValueError("Invalid Convolution Dimension")
+        return x
 
     def forward(self, x):
         return self.apply_pad(super().forward(x)) + self.apply_pad(self.res_conv(x))

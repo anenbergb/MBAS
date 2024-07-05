@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.nn.modules.conv import _ConvNd
 
 from dynamic_network_architectures.building_blocks.helper import convert_conv_op_to_dim
-
+from dynamic_network_architectures.initialization.weight_init import InitWeights_He
 
 from mbas.architectures.blocks import *
 
@@ -73,6 +73,7 @@ class MedNeXt(nn.Module):
         # self.dummy_tensor = nn.Parameter(torch.tensor([1.0]), requires_grad=True)
 
     def forward(self, x):
+        x = self.stem(x)
         skips = self.encoder(x)
         return self.decoder(skips)
 
@@ -86,6 +87,10 @@ class MedNeXt(nn.Module):
             input_size
         ) + self.decoder.compute_conv_feature_map_size(input_size)
 
+    @staticmethod
+    def initialize(module):
+        InitWeights_He(1e-2)(module)
+
 
 class MedNeXtEncoder(nn.Module):
     def __init__(
@@ -98,9 +103,6 @@ class MedNeXtEncoder(nn.Module):
         n_blocks_per_stage: List[int],
         exp_ratio_per_stage: List[int],
         return_skips: bool = False,
-        # TODO: refactor these arguments
-        do_res: bool = False,  # Can be used to individually test residual connection
-        do_res_up_down: bool = False,  # Additional 'res' connection on up and down convs
         norm_type: str = "group",
         enable_affine_transform: bool = False,
     ):
@@ -304,7 +306,7 @@ class MedNeXtDecoder(nn.Module):
                 seg_outputs.append(self.seg_layers[s](x))
 
             x_up = self.up_blocks[s](x)
-            x_skip = skips[-(s + 1)]
+            x_skip = skips[-(s + 2)]
             x = x_up + x_skip
             x = self.stages[s](x)
 
@@ -328,16 +330,21 @@ if __name__ == "__main__":
     def count_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    print(count_parameters(network))
+    print(network)
+    print(f"# parameters: {count_parameters(network)}")
 
     from fvcore.nn import FlopCountAnalysis
     from fvcore.nn import parameter_count_table
 
     x = torch.zeros((1, 1, 64, 64, 64), requires_grad=False).cuda()
     flops = FlopCountAnalysis(network, x)
-    print(flops.total())
+    print(f"# FLOPs: {flops.total()}")
+    print("Parameter count table:")
+    print(parameter_count_table(network, max_depth=2))
 
+    # B, C, D, H, W
+    x = torch.zeros((1, 1, 16, 96, 96), requires_grad=False).cuda()
     with torch.no_grad():
-        print(network)
-        x = torch.zeros((1, 1, 128, 128, 128)).cuda()
-        print(network(x)[0].shape)
+        segs = network(x)
+        for i, seg in enumerate(segs):
+            print(f"Segmentation mask shape: {seg.shape}")
