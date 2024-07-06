@@ -1,4 +1,5 @@
 from typing import Union, Type, List, Tuple
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn.modules.conv import _ConvNd
@@ -83,9 +84,13 @@ class MedNeXt(nn.Module):
             "batch channel. Do not give input_size=(b, c, x, y(, z)). "
             "Give input_size=(x, y(, z))!"
         )
-        return self.encoder.compute_conv_feature_map_size(
-            input_size
-        ) + self.decoder.compute_conv_feature_map_size(input_size)
+        stem_size = np.prod([self.stem.out_channels, *input_size])
+
+        return (
+            stem_size
+            + self.encoder.compute_conv_feature_map_size(input_size)
+            + self.decoder.compute_conv_feature_map_size(input_size)
+        )
 
     @staticmethod
     def initialize(module):
@@ -184,6 +189,16 @@ class MedNeXtEncoder(nn.Module):
             return features
         else:
             return features[-1]
+
+    def compute_conv_feature_map_size(self, input_size):
+        output = np.int64(0)
+        for i in range(len(self.stages)):
+            for block in self.stages[i]:
+                output += block.compute_conv_feature_map_size(input_size)
+            if i < len(self.stages) - 1:
+                output += self.down_blocks[i].compute_conv_feature_map_size(input_size)
+                input_size = [i // 2 for i in input_size]
+        return output
 
 
 class MedNeXtDecoder(nn.Module):
@@ -319,6 +334,31 @@ class MedNeXtDecoder(nn.Module):
             seg_outputs = seg_outputs[::-1]
             return seg_outputs
 
+    def compute_conv_feature_map_size(self, input_size):
+        """
+        IMPORTANT: input_size is the input_size of the encoder!
+        """
+        n_stages_encoder = len(self.encoder.output_channels)
+
+        # assume the encoder reduces input resolution by factor 2 each time
+        skip_sizes = []
+        for _ in range(n_stages_encoder):
+            skip_sizes.append([i // 2 for i in input_size])
+            input_size = skip_sizes[-1]
+
+        output = np.int64(0)
+        for s in range(len(self.stages)):
+            input_size = skip_sizes[-(s + 1)]
+            if self.deep_supervision:
+                output += np.prod([self.seg_layers[s].out_channels, *input_size])
+            output += self.up_blocks[s].compute_conv_feature_map_size(input_size)
+            input_size_up = skip_sizes[-(s + 2)]
+            for block in self.stages[s]:
+                output += block.compute_conv_feature_map_size(input_size_up)
+
+        output += np.prod([self.seg_layers[-1].out_channels, *skip_sizes[0]])
+        return output
+
 
 if __name__ == "__main__":
 
@@ -336,15 +376,15 @@ if __name__ == "__main__":
     from fvcore.nn import FlopCountAnalysis
     from fvcore.nn import parameter_count_table
 
+    # B, C, D, H, W
+    x = torch.zeros((1, 1, 16, 48, 48), requires_grad=False).cuda()
+    with torch.no_grad():
+        segs = network(x)
+        for i, seg in enumerate(segs):
+            print(f"Segmentation mask shape: {seg.shape}")
+
     x = torch.zeros((1, 1, 64, 64, 64), requires_grad=False).cuda()
     flops = FlopCountAnalysis(network, x)
     print(f"# FLOPs: {flops.total()}")
     print("Parameter count table:")
     print(parameter_count_table(network, max_depth=2))
-
-    # B, C, D, H, W
-    x = torch.zeros((1, 1, 16, 96, 96), requires_grad=False).cuda()
-    with torch.no_grad():
-        segs = network(x)
-        for i, seg in enumerate(segs):
-            print(f"Segmentation mask shape: {seg.shape}")

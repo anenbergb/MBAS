@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -110,6 +111,17 @@ class MedNeXtBlock(nn.Module):
             out = out + x
         return out
 
+    def compute_conv_feature_map_size(self, input_size):
+        assert len(input_size) == self.conv_dim, (
+            "just give the image size without color/feature channels or "
+            "batch channel. Do not give input_size=(b, c, x, y(, z)). "
+            "Give input_size=(x, y(, z))!"
+        )
+        conv1_size = np.prod([self.conv1.out_channels, *input_size])
+        conv2_size = np.prod([self.norm_conv2_act[1].out_channels, *input_size])
+        conv3_size = np.prod([self.conv3.out_channels, *input_size])
+        return conv1_size + conv2_size + conv3_size
+
 
 class MedNeXtDownBlock(MedNeXtBlock):
 
@@ -153,6 +165,19 @@ class MedNeXtDownBlock(MedNeXtBlock):
 
     def forward(self, x):
         return super().forward(x) + self.res_conv(x)
+
+    def compute_conv_feature_map_size(self, input_size):
+        assert len(input_size) == self.conv_dim, (
+            "just give the image size without color/feature channels or "
+            "batch channel. Do not give input_size=(b, c, x, y(, z)). "
+            "Give input_size=(x, y(, z))!"
+        )
+        input_size = [i // 2 for i in input_size]
+        conv1_size = np.prod([self.conv1.out_channels, *input_size])
+        conv2_size = np.prod([self.norm_conv2_act[1].out_channels, *input_size])
+        conv3_size = np.prod([self.conv3.out_channels, *input_size])
+        res_conv_size = np.prod([self.res_conv.out_channels, *input_size])
+        return conv1_size + conv2_size + conv3_size + res_conv_size
 
 
 class MedNeXtUpBlock(MedNeXtBlock):
@@ -208,6 +233,19 @@ class MedNeXtUpBlock(MedNeXtBlock):
 
     def forward(self, x):
         return self.apply_pad(super().forward(x)) + self.apply_pad(self.res_conv(x))
+
+    def compute_conv_feature_map_size(self, input_size):
+        assert len(input_size) == self.conv_dim, (
+            "just give the image size without color/feature channels or "
+            "batch channel. Do not give input_size=(b, c, x, y(, z)). "
+            "Give input_size=(x, y(, z))!"
+        )
+        input_size = [2 * i for i in input_size]  # after padding
+        conv1_size = np.prod([self.conv1.out_channels, *input_size])
+        conv2_size = np.prod([self.norm_conv2_act[1].out_channels, *input_size])
+        conv3_size = np.prod([self.conv3.out_channels, *input_size])
+        res_conv_size = np.prod([self.res_conv.out_channels, *input_size])
+        return conv1_size + conv2_size + conv3_size + res_conv_size
 
 
 class LayerNorm(nn.Module):
