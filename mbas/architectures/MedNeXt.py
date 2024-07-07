@@ -4,7 +4,10 @@ import torch
 import torch.nn as nn
 from torch.nn.modules.conv import _ConvNd
 
-from dynamic_network_architectures.building_blocks.helper import convert_conv_op_to_dim
+from dynamic_network_architectures.building_blocks.helper import (
+    convert_conv_op_to_dim,
+    maybe_convert_scalar_to_list,
+)
 from dynamic_network_architectures.initialization.weight_init import InitWeights_He
 
 from mbas.architectures.blocks import *
@@ -19,13 +22,8 @@ class MedNeXt(nn.Module):
         features_per_stage: List[int] = [32, 64, 128, 256, 512],
         conv_op: Type[_ConvNd] = nn.Conv3d,
         kernel_size: int = 3,
-        strides: List[Tuple[int, ...]] = [
-            (2, 2, 2),
-            (2, 2, 2),
-            (2, 2, 2),
-            (2, 2, 2),
-            (1, 1, 1),
-        ],
+        # kernel_sizes: Union[int, List[int], Tuple[int, ...]],
+        strides: Union[int, List[int], Tuple[int, ...]] = [1, 2, 2, 2, 2],
         n_blocks_per_stage: List[int] = [3, 4, 8, 8, 8],
         exp_ratio_per_stage: List[int] = [2, 3, 4, 4, 4],
         num_classes: int = 3,
@@ -56,9 +54,8 @@ class MedNeXt(nn.Module):
         )
         assert len(exp_ratio_per_stage_decoder) == (n_stages - 1)
 
-        self.stem = conv_op(input_channels, features_per_stage[0], kernel_size=1)
-
         self.encoder = MedNeXtEncoder(
+            input_channels=input_channels,
             n_stages=n_stages,
             features_per_stage=features_per_stage,
             conv_op=conv_op,
@@ -81,7 +78,6 @@ class MedNeXt(nn.Module):
         # self.dummy_tensor = nn.Parameter(torch.tensor([1.0]), requires_grad=True)
 
     def forward(self, x):
-        x = self.stem(x)
         skips = self.encoder(x)
         return self.decoder(skips)
 
@@ -91,13 +87,9 @@ class MedNeXt(nn.Module):
             "batch channel. Do not give input_size=(b, c, x, y(, z)). "
             "Give input_size=(x, y(, z))!"
         )
-        stem_size = np.prod([self.stem.out_channels, *input_size])
-
-        return (
-            stem_size
-            + self.encoder.compute_conv_feature_map_size(input_size)
-            + self.decoder.compute_conv_feature_map_size(input_size)
-        )
+        return self.encoder.compute_conv_feature_map_size(
+            input_size
+        ) + self.decoder.compute_conv_feature_map_size(input_size)
 
     @staticmethod
     def initialize(module):
@@ -107,12 +99,12 @@ class MedNeXt(nn.Module):
 class MedNeXtEncoder(nn.Module):
     def __init__(
         self,
+        input_channels: int,
         n_stages: int,
         features_per_stage: List[int],
         conv_op: Type[_ConvNd],
-        strides: List[Tuple[int, ...]],
         kernel_size: int,
-        # strides
+        strides: Union[int, List[int], Tuple[int, ...]],
         n_blocks_per_stage: List[int],
         exp_ratio_per_stage: List[int],
         return_skips: bool = False,
@@ -120,7 +112,7 @@ class MedNeXtEncoder(nn.Module):
         enable_affine_transform: bool = False,
     ):
         """
-        NOTE: Encoder does not include the stem
+        The first stage is the stem
 
         n_stages: 5
         features_per_stage: [32, 64, 128, 256, 512]
@@ -134,6 +126,8 @@ class MedNeXtEncoder(nn.Module):
         """
         super().__init__()
 
+        if isinstance(strides, int):
+            strides = [strides] * n_stages
         assert (
             len(features_per_stage) == n_stages
         ), "features_per_stage must have as many entries as we have resolution stages (n_stages)"
@@ -148,10 +142,31 @@ class MedNeXtEncoder(nn.Module):
         ), "strides must have as many entries as we have resolution stages (n_stages)"
 
         self.stages = nn.ModuleList()
-        self.down_blocks = nn.ModuleList()
         for i in range(n_stages):
-            stage = nn.Sequential(
-                *[
+            blocks = []
+            if i == 0:
+                # TODO: update kernel size to be variable for the stem
+                down_block = conv_op(
+                    input_channels,
+                    features_per_stage[i],
+                    kernel_size=1,
+                    stride=strides[i],
+                    padding=0,
+                )
+            else:
+                down_block = MedNeXtDownBlock(
+                    in_channels=input_channels,
+                    out_channels=features_per_stage[i],
+                    conv_op=conv_op,
+                    exp_ratio=exp_ratio_per_stage[i],
+                    kernel_size=kernel_size,
+                    stride=strides[i],
+                    norm_type=norm_type,
+                    enable_affine_transform=enable_affine_transform,
+                )
+            blocks.append(down_block)
+            for _ in range(n_blocks_per_stage[i]):
+                blocks.append(
                     MedNeXtBlock(
                         in_channels=features_per_stage[i],
                         out_channels=features_per_stage[i],
@@ -161,25 +176,12 @@ class MedNeXtEncoder(nn.Module):
                         norm_type=norm_type,
                         enable_affine_transform=enable_affine_transform,
                     )
-                    for _ in range(n_blocks_per_stage[i])
-                ]
-            )
-            self.stages.append(stage)
-            if i < n_stages - 1:
-                self.down_blocks.append(
-                    MedNeXtDownBlock(
-                        in_channels=features_per_stage[i],
-                        out_channels=features_per_stage[i + 1],
-                        conv_op=conv_op,
-                        exp_ratio=exp_ratio_per_stage[i + 1],
-                        kernel_size=kernel_size,
-                        stride=strides[i],
-                        norm_type=norm_type,
-                        enable_affine_transform=enable_affine_transform,
-                    )
                 )
+            self.stages.append(nn.Sequential(*blocks))
+            input_channels = features_per_stage[i]
 
         self.output_channels = features_per_stage
+        self.strides = [maybe_convert_scalar_to_list(conv_op, i) for i in strides]
         self.return_skips = return_skips
 
         self.n_blocks_per_stage = n_blocks_per_stage
@@ -192,25 +194,27 @@ class MedNeXtEncoder(nn.Module):
 
     def forward(self, x):
         features = []
-        for i, stage in enumerate(self.stages):
+        for stage in self.stages:
             x = stage(x)
             features.append(x)
-            if i < len(self.down_blocks):
-                x = self.down_blocks[i](x)
         if self.return_skips:
             return features
         else:
             return features[-1]
 
     def compute_conv_feature_map_size(self, input_size):
-        # TODO: ACCOUNT FOR STRIDES
         output = np.int64(0)
         for i in range(len(self.stages)):
-            for block in self.stages[i]:
-                output += block.compute_conv_feature_map_size(input_size)
-            if i < len(self.stages) - 1:
-                output += self.down_blocks[i].compute_conv_feature_map_size(input_size)
-                input_size = [i // 2 for i in input_size]
+            for j, block in enumerate(self.stages[i]):
+                if isinstance(block, self.conv_op):
+                    output += np.prod([block.out_channels, *input_size])
+                else:
+                    output += block.compute_conv_feature_map_size(input_size)
+                if j == 0:  # first block is always the down block
+                    assert isinstance(block, MedNeXtDownBlock) or isinstance(
+                        block, self.conv_op
+                    )
+                    input_size = [i // j for i, j in zip(input_size, self.strides[i])]
         return output
 
 
@@ -247,12 +251,12 @@ class MedNeXtDecoder(nn.Module):
         assert len(n_blocks_per_stage) == n_stages_encoder - 1, (
             "n_blocks_per_stage must have as many entries as we have "
             "resolution stages - 1 (n_stages in encoder - 1), "
-            "here: %d" % n_stages_encoder
+            f"here: {n_stages_encoder}"
         )
         assert len(exp_ratio_per_stage) == n_stages_encoder - 1, (
             "exp_ratio_per_stage must have as many entries as we have "
             "resolution stages - 1 (n_stages in encoder - 1), "
-            "here: %d" % n_stages_encoder
+            f"here: {n_stages_encoder}"
         )
 
         conv_op = encoder.conv_op
@@ -263,23 +267,23 @@ class MedNeXtDecoder(nn.Module):
         self.stages = nn.ModuleList()
         self.up_blocks = nn.ModuleList()
         self.seg_layers = nn.ModuleList()
+
+        # Output mask after bottleneck
+        self.seg_layers.append(
+            encoder.conv_op(
+                encoder.output_channels[-1],
+                num_classes,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                bias=True,
+            )
+        )
+
         for s in range(1, n_stages_encoder):
             input_features_below = encoder.output_channels[-s]
             input_features_skip = encoder.output_channels[-(s + 1)]
-
-            # we always build the deep supervision outputs so that we can always load parameters. If we don't do this
-            # then a model trained with deep_supervision=True could not easily be loaded at inference time where
-            # deep supervision is not needed. It's just a convenience thing
-            self.seg_layers.append(
-                encoder.conv_op(
-                    input_features_below,
-                    num_classes,
-                    kernel_size=1,
-                    stride=1,
-                    padding=0,
-                    bias=True,
-                )
-            )
+            strides_for_upsample = encoder.strides[-s]
 
             self.up_blocks.append(
                 MedNeXtUpBlock(
@@ -288,6 +292,7 @@ class MedNeXtDecoder(nn.Module):
                     conv_op=conv_op,
                     exp_ratio=exp_ratio_per_stage[s - 1],
                     kernel_size=kernel_size,
+                    stride=strides_for_upsample,
                     norm_type=norm_type,
                     enable_affine_transform=enable_affine_transform,
                 )
@@ -307,18 +312,16 @@ class MedNeXtDecoder(nn.Module):
                 ]
             )
             self.stages.append(stage)
-
-        # Final output mask
-        self.seg_layers.append(
-            encoder.conv_op(
-                encoder.output_channels[0],
-                num_classes,
-                kernel_size=1,
-                stride=1,
-                padding=0,
-                bias=True,
+            self.seg_layers.append(
+                encoder.conv_op(
+                    input_features_skip,
+                    num_classes,
+                    kernel_size=1,
+                    stride=1,
+                    padding=0,
+                    bias=True,
+                )
             )
-        )
 
         self.n_blocks_per_stage = n_blocks_per_stage
         self.exp_ratio_per_stage = exp_ratio_per_stage
@@ -329,53 +332,60 @@ class MedNeXtDecoder(nn.Module):
         """
         x = skips[-1]
         seg_outputs = []
+        if self.deep_supervision:
+            seg_outputs.append(self.seg_layers[0](x))  # seg after bottleneck
         for s in range(len(self.stages)):
-            if self.deep_supervision:
-                seg_outputs.append(self.seg_layers[s](x))
-
             x_up = self.up_blocks[s](x)
             x_skip = skips[-(s + 2)]
             x = x_up + x_skip
             x = self.stages[s](x)
+            if self.deep_supervision or s == (len(self.stages) - 1):
+                seg_outputs.append(self.seg_layers[s + 1](x))
 
-        final_output = self.seg_layers[-1](x)
-        if not self.deep_supervision:
-            return final_output
-        else:
-            seg_outputs.append(final_output)
-            # invert seg outputs so that the largest segmentation prediction is returned first
-            seg_outputs = seg_outputs[::-1]
+        # invert seg outputs so that the largest segmentation prediction is returned first
+        seg_outputs = seg_outputs[::-1]
+
+        if self.deep_supervision:
             return seg_outputs
+        else:
+            return seg_outputs[0]
 
     def compute_conv_feature_map_size(self, input_size):
         """
         IMPORTANT: input_size is the input_size of the encoder!
         """
-        n_stages_encoder = len(self.encoder.output_channels)
-
-        # assume the encoder reduces input resolution by factor 2 each time
         skip_sizes = []
-        for _ in range(n_stages_encoder):
-            skip_sizes.append([i // 2 for i in input_size])
+        for s in range(len(self.encoder.strides)):
+            skip_sizes.append(
+                [i // j for i, j in zip(input_size, self.encoder.strides[s])]
+            )
             input_size = skip_sizes[-1]
 
         output = np.int64(0)
-        for s in range(len(self.stages)):
-            input_size = skip_sizes[-(s + 1)]
-            if self.deep_supervision:
-                output += np.prod([self.seg_layers[s].out_channels, *input_size])
-            output += self.up_blocks[s].compute_conv_feature_map_size(input_size)
-            input_size_up = skip_sizes[-(s + 2)]
-            for block in self.stages[s]:
-                output += block.compute_conv_feature_map_size(input_size_up)
+        if self.deep_supervision:
+            # after the bottleneck
+            output += np.prod(
+                [self.seg_layers[0].out_channels, *skip_sizes[-1]], dtype=np.int64
+            )
 
-        output += np.prod([self.seg_layers[-1].out_channels, *skip_sizes[0]])
+        for s in range(len(self.stages)):
+            output += self.up_blocks[s].compute_conv_feature_map_size(
+                skip_sizes[-(s + 1)]
+            )
+            for block in self.stages[s]:
+                output += block.compute_conv_feature_map_size(skip_sizes[-(s + 2)])
+            if self.deep_supervision or s == (len(self.stages) - 1):
+                output += np.prod(
+                    [self.seg_layers[s + 1].out_channels, *skip_sizes[-(s + 2)]],
+                    dtype=np.int64,
+                )
+
         return output
 
 
 if __name__ == "__main__":
 
-    strides = [(2, 2, 2), (2, 2, 2), (2, 2, 2), (2, 2, 2), (1, 1, 1)]
+    strides = [(1, 1, 1), (1, 2, 2), (2, 2, 2), (2, 2, 2), (2, 2, 2)]
     network = MedNeXt(
         input_channels=1,
         strides=strides,
