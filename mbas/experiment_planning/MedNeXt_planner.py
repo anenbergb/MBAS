@@ -140,6 +140,8 @@ class MedNeXtPlanner(ExperimentPlanner):
         patch_size = np.array([16, 96, 96])
         # num_stages = len(pool_op_kernel_sizes)
         # norm = get_matching_instancenorm(unet_conv_op)
+        strides = [(1, 1, 1), (1, 2, 2), (2, 2, 2), (2, 2, 2), (2, 2, 2)]
+
         architecture_kwargs = {
             "network_class_name": "mbas.architectures.MedNeXt.MedNeXt",
             "arch_kwargs": {
@@ -147,6 +149,7 @@ class MedNeXtPlanner(ExperimentPlanner):
                 "features_per_stage": [32, 64, 128, 256, 512],
                 "conv_op": "torch.nn.modules.conv.Conv3d",
                 "kernel_size": 3,
+                "strides": strides,
                 "n_blocks_per_stage": [3, 4, 8, 8, 8],
                 "exp_ratio_per_stage": [2, 3, 4, 4, 4],
                 "n_blocks_per_stage_decoder": [8, 8, 4, 3],
@@ -172,7 +175,7 @@ class MedNeXtPlanner(ExperimentPlanner):
             _cache[_keygen(patch_size, pool_op_kernel_sizes)] = estimate
 
         # TODO: auto determine batch size
-        batch_size = 24 if len(spacing) == 3 else 2
+        batch_size = 2 if len(spacing) == 3 else 12
 
         (
             resampling_data,
