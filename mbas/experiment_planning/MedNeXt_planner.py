@@ -53,18 +53,6 @@ class MedNeXtPlanner(ExperimentPlanner):
         self.UNet_class = MedNeXt
         self.featuremap_min_edge_length = 1
 
-    def generate_data_identifier(self, configuration_name: str) -> str:
-        """
-        configurations are unique within each plans file but different plans file can have configurations with the
-        same name. In order to distinguish the associated data we need a data identifier that reflects not just the
-        config but also the plans it originates from
-        """
-        if configuration_name == "2d" or configuration_name == "3d_fullres":
-            # we do not deviate from ExperimentPlanner so we can reuse its data
-            return "nnUNetPlans" + "_" + configuration_name
-        else:
-            return self.plans_identifier + "_" + configuration_name
-
     def get_plans_for_configuration(
         self,
         spacing: Union[np.ndarray, Tuple[float, ...], List[float]],
@@ -272,7 +260,6 @@ class MedNeXtPlanner(ExperimentPlanner):
             join(nnUNet_preprocessed, self.dataset_name, "dataset.json"),
         )
 
-        # json is ###. I hate it... "Object of type int64 is not JSON serializable"
         plans = {
             "dataset_name": self.dataset_name,
             "plans_name": self.plans_identifier,
@@ -290,6 +277,12 @@ class MedNeXtPlanner(ExperimentPlanner):
                 "foreground_intensity_properties_per_channel"
             ],
         }
+        # TODO: add other definitions for cascade training
+        # plans['configurations']['3d_lowres']['next_stage'] = '3d_cascade_fullres'
+        # plans['configurations']['3d_cascade_fullres'] = {
+        #   'inherits_from': '3d_fullres',
+        #   'previous_stage': '3d_lowres'
+        # }
 
         self.plans = plans
         self.save_plans(plans)

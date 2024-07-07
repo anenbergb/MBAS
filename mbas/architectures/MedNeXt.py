@@ -19,7 +19,13 @@ class MedNeXt(nn.Module):
         features_per_stage: List[int] = [32, 64, 128, 256, 512],
         conv_op: Type[_ConvNd] = nn.Conv3d,
         kernel_size: int = 3,
-        # strides
+        strides: List[Tuple[int, ...]] = [
+            (2, 2, 2),
+            (2, 2, 2),
+            (2, 2, 2),
+            (2, 2, 2),
+            (1, 1, 1),
+        ],
         n_blocks_per_stage: List[int] = [3, 4, 8, 8, 8],
         exp_ratio_per_stage: List[int] = [2, 3, 4, 4, 4],
         num_classes: int = 3,
@@ -57,6 +63,7 @@ class MedNeXt(nn.Module):
             features_per_stage=features_per_stage,
             conv_op=conv_op,
             kernel_size=kernel_size,
+            strides=strides,
             n_blocks_per_stage=n_blocks_per_stage,
             exp_ratio_per_stage=exp_ratio_per_stage,
             return_skips=True,
@@ -103,6 +110,7 @@ class MedNeXtEncoder(nn.Module):
         n_stages: int,
         features_per_stage: List[int],
         conv_op: Type[_ConvNd],
+        strides: List[Tuple[int, ...]],
         kernel_size: int,
         # strides
         n_blocks_per_stage: List[int],
@@ -135,6 +143,9 @@ class MedNeXtEncoder(nn.Module):
         assert (
             len(exp_ratio_per_stage) == n_stages
         ), "exp_ratio_per_stage must have as many entries as we have resolution stages (n_stages)"
+        assert (
+            len(strides) == n_stages
+        ), "strides must have as many entries as we have resolution stages (n_stages)"
 
         self.stages = nn.ModuleList()
         self.down_blocks = nn.ModuleList()
@@ -162,6 +173,7 @@ class MedNeXtEncoder(nn.Module):
                         conv_op=conv_op,
                         exp_ratio=exp_ratio_per_stage[i + 1],
                         kernel_size=kernel_size,
+                        stride=strides[i],
                         norm_type=norm_type,
                         enable_affine_transform=enable_affine_transform,
                     )
@@ -191,6 +203,7 @@ class MedNeXtEncoder(nn.Module):
             return features[-1]
 
     def compute_conv_feature_map_size(self, input_size):
+        # TODO: ACCOUNT FOR STRIDES
         output = np.int64(0)
         for i in range(len(self.stages)):
             for block in self.stages[i]:
@@ -362,8 +375,10 @@ class MedNeXtDecoder(nn.Module):
 
 if __name__ == "__main__":
 
+    strides = [(2, 2, 2), (2, 2, 2), (2, 2, 2), (2, 2, 2), (1, 1, 1)]
     network = MedNeXt(
         input_channels=1,
+        strides=strides,
         deep_supervision=True,
     ).cuda()
 

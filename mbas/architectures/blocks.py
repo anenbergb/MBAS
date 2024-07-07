@@ -8,6 +8,7 @@ from typing import Union, Type, List, Tuple
 from dynamic_network_architectures.building_blocks.helper import (
     convert_conv_op_to_dim,
     get_matching_convtransp,
+    maybe_convert_scalar_to_list,
 )
 
 
@@ -132,6 +133,7 @@ class MedNeXtDownBlock(MedNeXtBlock):
         conv_op: Type[_ConvNd] = nn.Conv3d,
         exp_ratio: int = 4,
         kernel_size: int = 7,
+        stride: Union[int, List[int], Tuple[int, ...]] = 2,
         norm_type: str = "group",
         n_groups: int | None = None,
         enable_affine_transform: bool = False,
@@ -148,19 +150,25 @@ class MedNeXtDownBlock(MedNeXtBlock):
             enable_affine_transform,
             enable_residual=False,
         )
+        stride = maybe_convert_scalar_to_list(conv_op, stride)
+        self.stride = stride
+        kernel_size = maybe_convert_scalar_to_list(conv_op, kernel_size)
+
         self.conv1 = conv_op(
             in_channels=in_channels,
             out_channels=in_channels,
             kernel_size=kernel_size,
-            stride=2,
-            padding=kernel_size // 2,
+            stride=stride,
+            padding=[(i - 1) // 2 for i in kernel_size],
+            dilation=1,
             groups=self.n_groups,
         )
         self.res_conv = conv_op(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=1,
-            stride=2,
+            stride=stride,
+            padding=0,
         )
 
     def forward(self, x):
@@ -172,11 +180,11 @@ class MedNeXtDownBlock(MedNeXtBlock):
             "batch channel. Do not give input_size=(b, c, x, y(, z)). "
             "Give input_size=(x, y(, z))!"
         )
-        input_size = [i // 2 for i in input_size]
-        conv1_size = np.prod([self.conv1.out_channels, *input_size])
-        conv2_size = np.prod([self.norm_conv2_act[1].out_channels, *input_size])
-        conv3_size = np.prod([self.conv3.out_channels, *input_size])
-        res_conv_size = np.prod([self.res_conv.out_channels, *input_size])
+        output_size = [i // j for i, j in zip(input_size, self.stride)]
+        conv1_size = np.prod([self.conv1.out_channels, *output_size])
+        conv2_size = np.prod([self.norm_conv2_act[1].out_channels, *output_size])
+        conv3_size = np.prod([self.conv3.out_channels, *output_size])
+        res_conv_size = np.prod([self.res_conv.out_channels, *output_size])
         return conv1_size + conv2_size + conv3_size + res_conv_size
 
 
@@ -189,6 +197,7 @@ class MedNeXtUpBlock(MedNeXtBlock):
         conv_op: Type[_ConvNd] = nn.Conv3d,
         exp_ratio: int = 4,
         kernel_size: int = 7,
+        stride: Union[int, List[int], Tuple[int, ...]] = 2,
         norm_type: str = "group",
         n_groups: int | None = None,
         enable_affine_transform: bool = False,
@@ -205,20 +214,26 @@ class MedNeXtUpBlock(MedNeXtBlock):
             enable_affine_transform,
             enable_residual=False,
         )
+        stride = maybe_convert_scalar_to_list(conv_op, stride)
+        self.stride = stride
+        kernel_size = maybe_convert_scalar_to_list(conv_op, kernel_size)
+
         conv_trans_op = get_matching_convtransp(conv_op)
         self.conv1 = conv_trans_op(
             in_channels=in_channels,
             out_channels=in_channels,
             kernel_size=kernel_size,
-            stride=2,
-            padding=kernel_size // 2,
+            stride=stride,
+            padding=[(i - 1) // 2 for i in kernel_size],
+            dilation=1,
             groups=self.n_groups,
         )
         self.res_conv = conv_trans_op(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=1,
-            stride=2,
+            stride=stride,
+            padding=0,
         )
 
     def apply_pad(self, x):
@@ -240,11 +255,11 @@ class MedNeXtUpBlock(MedNeXtBlock):
             "batch channel. Do not give input_size=(b, c, x, y(, z)). "
             "Give input_size=(x, y(, z))!"
         )
-        input_size = [2 * i for i in input_size]  # after padding
-        conv1_size = np.prod([self.conv1.out_channels, *input_size])
-        conv2_size = np.prod([self.norm_conv2_act[1].out_channels, *input_size])
-        conv3_size = np.prod([self.conv3.out_channels, *input_size])
-        res_conv_size = np.prod([self.res_conv.out_channels, *input_size])
+        output_size = [i * j for i, j in zip(input_size, self.stride)]
+        conv1_size = np.prod([self.conv1.out_channels, *output_size])
+        conv2_size = np.prod([self.norm_conv2_act[1].out_channels, *output_size])
+        conv3_size = np.prod([self.conv3.out_channels, *output_size])
+        res_conv_size = np.prod([self.res_conv.out_channels, *output_size])
         return conv1_size + conv2_size + conv3_size + res_conv_size
 
 
