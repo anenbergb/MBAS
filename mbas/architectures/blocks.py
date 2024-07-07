@@ -235,19 +235,32 @@ class MedNeXtUpBlock(MedNeXtBlock):
             stride=stride,
             padding=0,
         )
+        padding = self.compute_padding_from_stride(stride)
+        if self.conv_dim == 3:
+            self.zero_pad = nn.ZeroPad3d(padding)
+        elif self.conv_dim == 2:
+            self.zero_pad = nn.ZeroPad2d(padding)
 
-    def apply_pad(self, x):
-        # Asymmetry but necessary to match shape
-        if self.conv_dim == 2:
-            x = torch.nn.functional.pad(x, (1, 0, 1, 0))
-        elif self.conv_dim == 3:
-            x = torch.nn.functional.pad(x, (1, 0, 1, 0, 1, 0))
-        else:
-            raise ValueError("Invalid Convolution Dimension")
-        return x
+    def compute_padding_from_stride(self, stride):
+        """
+        stride is ordered as (D, H, W)
+        The padding 6-tuple should be ordered as
+        (padding_left, padding_right, padding_top, padding_bottom, padding_front, padding_back)
+
+        The output padded tensor is ordered as (D_out, H_out, W_out) where
+        D_out = padding_front + D + padding_out
+        H_out = padding_top + H + padding_bottom
+        W_out = padding_left + W + padding_right
+        """
+        padding = []
+        for s in stride[::-1]:
+            l_pad = (s - 1) // 2 + (s - 1) % 2
+            r_pad = (s - 1) // 2
+            padding.extend([l_pad, r_pad])
+        return padding
 
     def forward(self, x):
-        return self.apply_pad(super().forward(x)) + self.apply_pad(self.res_conv(x))
+        return self.zero_pad(super().forward(x)) + self.zero_pad(self.res_conv(x))
 
     def compute_conv_feature_map_size(self, input_size):
         assert len(input_size) == self.conv_dim, (

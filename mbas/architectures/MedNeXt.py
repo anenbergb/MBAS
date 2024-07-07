@@ -146,6 +146,7 @@ class MedNeXtEncoder(nn.Module):
             blocks = []
             if i == 0:
                 # TODO: update kernel size to be variable for the stem
+                # stride has to be 1 for stem
                 down_block = conv_op(
                     input_channels,
                     features_per_stage[i],
