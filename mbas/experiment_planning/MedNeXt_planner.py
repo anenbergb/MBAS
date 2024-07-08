@@ -137,28 +137,57 @@ class MedNeXtPlanner(ExperimentPlanner):
         ) = get_pool_and_conv_props(
             spacing, initial_patch_size, self.featuremap_min_edge_length, 999999
         )
-        patch_size = np.array([16, 96, 96])
         # num_stages = len(pool_op_kernel_sizes)
         # norm = get_matching_instancenorm(unet_conv_op)
-        strides = [(1, 1, 1), (1, 2, 2), (2, 2, 2), (2, 2, 2), (2, 2, 2)]
 
+        patch_size = np.array([16, 256, 256])
+        strides = [
+            (1, 1, 1),
+            (1, 2, 2),
+            (1, 2, 2),
+            (2, 2, 2),
+            (2, 2, 2),
+            (1, 2, 2),
+            (1, 2, 2),
+        ]
         architecture_kwargs = {
             "network_class_name": "mbas.architectures.MedNeXt.MedNeXt",
             "arch_kwargs": {
-                "n_stages": 5,
-                "features_per_stage": [32, 64, 128, 256, 512],
+                "n_stages": 7,
+                "features_per_stage": [32, 64, 128, 256, 320, 320, 320],
                 "conv_op": "torch.nn.modules.conv.Conv3d",
                 "kernel_size": 3,
                 "strides": strides,
-                "n_blocks_per_stage": [3, 4, 8, 8, 8],
-                "exp_ratio_per_stage": [2, 3, 4, 4, 4],
-                "n_blocks_per_stage_decoder": [8, 8, 4, 3],
-                "exp_ratio_per_stage_decoder": [4, 4, 3, 2],
+                "n_blocks_per_stage": [3, 4, 6, 6, 6, 6, 6],
+                "exp_ratio_per_stage": [2, 3, 4, 4, 4, 4, 4],
+                "n_blocks_per_stage_decoder": [6, 6, 6, 6, 4, 3],
+                "exp_ratio_per_stage_decoder": [4, 4, 4, 4, 3, 2],
                 "norm_type": "group",
                 "enable_affine_transform": False,
             },
             "_kw_requires_import": ("conv_op",),
         }
+
+        # DEFAULT SETTINGS from MedNeXt
+        # patch_size = np.array([16, 96, 96])
+        # strides = [(1, 1, 1), (1, 2, 2), (2, 2, 2), (2, 2, 2), (2, 2, 2)]
+        # architecture_kwargs = {
+        #     "network_class_name": "mbas.architectures.MedNeXt.MedNeXt",
+        #     "arch_kwargs": {
+        #         "n_stages": 5,
+        #         "features_per_stage": [32, 64, 128, 256, 512],
+        #         "conv_op": "torch.nn.modules.conv.Conv3d",
+        #         "kernel_size": 3,
+        #         "strides": strides,
+        #         "n_blocks_per_stage": [3, 4, 8, 8, 8],
+        #         "exp_ratio_per_stage": [2, 3, 4, 4, 4],
+        #         "n_blocks_per_stage_decoder": [8, 8, 4, 3],
+        #         "exp_ratio_per_stage_decoder": [4, 4, 3, 2],
+        #         "norm_type": "group",
+        #         "enable_affine_transform": False,
+        #     },
+        #     "_kw_requires_import": ("conv_op",),
+        # }
 
         # now estimate vram consumption
         if _keygen(patch_size, pool_op_kernel_sizes) in _cache.keys():
@@ -243,7 +272,7 @@ class MedNeXtPlanner(ExperimentPlanner):
             approximate_n_voxels_dataset,
             _tmp,
         )
-        plan_3d_fullres["batch_dice"] = False
+        plan_3d_fullres["batch_dice"] = True
         print("3D MedNeXt configuration:")
         print(plan_3d_fullres)
         print()
