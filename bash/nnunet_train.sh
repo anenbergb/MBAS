@@ -8,7 +8,7 @@ conda activate $CONDA
 
 export nnUNet_raw="/home/bryan/data/nnUNet_raw"
 export nnUNet_preprocessed="/home/bryan/data/nnUNet_preprocessed"
-export nnUNet_results="/home/bryan/expr/nnUNet_results"
+export nnUNet_results="/home/bryan/expr/nnUNet_results_debug"
 export nnUNet_n_proc_DA=4
 
 # nnUNetv2_train 101 3d_fullres 0 --npz -tr nnUNetTrainer_250epochs -p nnUNetResEncUNetMPlans
@@ -35,8 +35,10 @@ export nnUNet_n_proc_DA=4
 # nnUNetv2_train 101 2d 3 --npz -tr nnUNetTrainer_250epochs -p nnUNetResEncUNetMPlans
 # nnUNetv2_train 101 2d 4 --npz -tr nnUNetTrainer_250epochs -p nnUNetResEncUNetMPlans
 
-nnUNetv2_train 101 3d_fullres 0 --npz -p nnUNetResEncUNetMPlans --val
-nnUNetv2_train 101 3d_fullres 1 --npz -p nnUNetResEncUNetMPlans
-nnUNetv2_train 101 3d_fullres 2 --npz -p nnUNetResEncUNetMPlans
-nnUNetv2_train 101 3d_fullres 3 --npz -p nnUNetResEncUNetMPlans
-nnUNetv2_train 101 3d_fullres 4 --npz -p nnUNetResEncUNetMPlans
+# nnUNetv2_train 101 3d_fullres 0 --npz -p nnUNetResEncUNetMPlans --val
+# nnUNetv2_train 101 3d_fullres 1 --npz -p nnUNetResEncUNetMPlans
+# nnUNetv2_train 101 3d_fullres 2 --npz -p nnUNetResEncUNetMPlans
+# nnUNetv2_train 101 3d_fullres 3 --npz -p nnUNetResEncUNetMPlans
+# nnUNetv2_train 101 3d_fullres 4 --npz -p nnUNetResEncUNetMPlans
+
+nnUNetv2_train 101 3d_fullres 0 -p nnUNetResEncUNetMPlans
