@@ -52,6 +52,18 @@ class MedNeXtPlanner(ExperimentPlanner):
         )
         self.UNet_class = MedNeXt
         self.featuremap_min_edge_length = 1
+        self.UNet_min_batch_size = 2
+        self.UNet_base_num_features = 32
+        self.UNet_max_features_2d = 512
+        self.UNet_max_features_3d = 320
+        self.UNet_n_blocks_per_stage = (3, 4, 6, 6, 6, 6, 6, 6, 6, 6)
+        self.UNet_n_blocks_per_stage_decoder = (6, 6, 6, 6, 6, 6, 6, 4, 3)
+        self.UNet_exp_ratio_per_stage = (2, 3, 4, 4, 4, 4, 4, 4, 4, 4)
+        self.UNet_exp_ratio_per_stage_decoder = (4, 4, 4, 4, 4, 4, 4, 3, 2)
+
+        self.UNet_reference_val_2d = 2973327296  # IDK why this value
+        self.UNet_reference_val_3d = 2973327296  # 2.77 GB
+        self.UNet_reference_val_corresp_GB = 2.77
 
     def get_plans_for_configuration(
         self,
@@ -68,6 +80,7 @@ class MedNeXtPlanner(ExperimentPlanner):
         """
 
         def _features_per_stage(num_stages, max_num_features) -> Tuple[int, ...]:
+            # example: (32, 64, 128, 256, 512)
             return tuple(
                 [
                     min(max_num_features, self.UNet_base_num_features * 2**i)
@@ -112,12 +125,12 @@ class MedNeXtPlanner(ExperimentPlanner):
         else:
             raise RuntimeError()
 
-        # clip initial patch size to median_shape. It makes little sense to have it be larger than that. Note that
-        # this is different from how nnU-Net v1 does it!
+        # clip initial patch size to median_shape.
         # todo patch size can still get too large because we pad the patch size to a multiple of 2**n
         initial_patch_size = np.minimum(
             initial_patch_size, median_shape[: len(spacing)]
         )
+        initial_patch_size = np.array([16, 256, 256])
 
         # use that to get the network topology. Note that this changes the patch_size depending on the number of
         # pooling operations (must be divisible by 2**num_pool in each axis)
@@ -135,38 +148,93 @@ class MedNeXtPlanner(ExperimentPlanner):
             patch_size,
             shape_must_be_divisible_by,
         ) = get_pool_and_conv_props(
-            spacing, initial_patch_size, self.featuremap_min_edge_length, 999999
+            spacing, initial_patch_size, self.featuremap_min_edge_length, 6
         )
         # num_stages = len(pool_op_kernel_sizes)
         # norm = get_matching_instancenorm(unet_conv_op)
 
-        patch_size = np.array([16, 256, 256])
-        strides = [
-            (1, 1, 1),
-            (1, 2, 2),
-            (1, 2, 2),
-            (2, 2, 2),
-            (2, 2, 2),
-            (1, 2, 2),
-            (1, 2, 2),
-        ]
+        num_stages = len(pool_op_kernel_sizes)
+
+        # ASSERT that that the first stride = 1
+        assert pool_op_kernel_sizes[0] == (1,) * len(spacing)
         architecture_kwargs = {
             "network_class_name": "mbas.architectures.MedNeXt.MedNeXt",
             "arch_kwargs": {
-                "n_stages": 7,
-                "features_per_stage": [32, 64, 128, 256, 320, 320, 320],
+                "n_stages": num_stages,
+                "features_per_stage": _features_per_stage(num_stages, max_num_features),
                 "conv_op": "torch.nn.modules.conv.Conv3d",
-                "kernel_size": 3,
-                "strides": strides,
-                "n_blocks_per_stage": [3, 4, 6, 6, 6, 6, 6],
-                "exp_ratio_per_stage": [2, 3, 4, 4, 4, 4, 4],
-                "n_blocks_per_stage_decoder": [6, 6, 6, 6, 4, 3],
-                "exp_ratio_per_stage_decoder": [4, 4, 4, 4, 3, 2],
+                "stem_kernel_size": 1,
+                "kernel_sizes": conv_kernel_sizes,
+                "strides": pool_op_kernel_sizes,
+                "n_blocks_per_stage": self.UNet_n_blocks_per_stage[:num_stages],
+                "exp_ratio_per_stage": self.UNet_exp_ratio_per_stage[:num_stages],
+                "n_blocks_per_stage_decoder": self.UNet_n_blocks_per_stage_decoder[
+                    : num_stages - 1
+                ],
+                "exp_ratio_per_stage_decoder": self.UNet_exp_ratio_per_stage_decoder[
+                    : num_stages - 1
+                ],
                 "norm_type": "group",
                 "enable_affine_transform": False,
             },
             "_kw_requires_import": ("conv_op",),
         }
+
+        # Second Experiment
+        # patch_size = np.array([16, 128, 128])
+        # strides = [
+        #     (1, 1, 1),
+        #     (1, 2, 2),
+        #     (2, 2, 2),
+        #     (2, 2, 2),
+        #     (1, 2, 2),
+        # ]
+        # architecture_kwargs = {
+        #     "network_class_name": "mbas.architectures.MedNeXt.MedNeXt",
+        #     "arch_kwargs": {
+        #         "n_stages": 5,
+        #         "features_per_stage": [64, 96, 128, 256, 320],
+        #         "conv_op": "torch.nn.modules.conv.Conv3d",
+        #         "kernel_size": 5,
+        #         "strides": strides,
+        #         "n_blocks_per_stage": [4, 4, 6, 4, 4],
+        #         "exp_ratio_per_stage": [2, 3, 4, 4, 4],
+        #         "n_blocks_per_stage_decoder": [4, 6, 4, 4],
+        #         "exp_ratio_per_stage_decoder": [4, 4, 3, 2],
+        #         "norm_type": "group",
+        #         "enable_affine_transform": False,
+        #     },
+        #     "_kw_requires_import": ("conv_op",),
+        # }
+
+        # First experiment
+        # patch_size = np.array([16, 256, 256])
+        # strides = [
+        #     (1, 1, 1),
+        #     (1, 2, 2),
+        #     (1, 2, 2),
+        #     (2, 2, 2),
+        #     (2, 2, 2),
+        #     (1, 2, 2),
+        #     (1, 2, 2),
+        # ]
+        # architecture_kwargs = {
+        #     "network_class_name": "mbas.architectures.MedNeXt.MedNeXt",
+        #     "arch_kwargs": {
+        #         "n_stages": 7,
+        #         "features_per_stage": [32, 64, 128, 256, 320, 320, 320],
+        #         "conv_op": "torch.nn.modules.conv.Conv3d",
+        #         "kernel_size": 3,
+        #         "strides": strides,
+        #         "n_blocks_per_stage": [3, 4, 6, 6, 6, 6, 6],
+        #         "exp_ratio_per_stage": [2, 3, 4, 4, 4, 4, 4],
+        #         "n_blocks_per_stage_decoder": [6, 6, 6, 6, 4, 3],
+        #         "exp_ratio_per_stage_decoder": [4, 4, 4, 4, 3, 2],
+        #         "norm_type": "group",
+        #         "enable_affine_transform": False,
+        #     },
+        #     "_kw_requires_import": ("conv_op",),
+        # }
 
         # DEFAULT SETTINGS from MedNeXt
         # patch_size = np.array([16, 96, 96])
@@ -202,6 +270,62 @@ class MedNeXtPlanner(ExperimentPlanner):
                 architecture_kwargs["_kw_requires_import"],
             )
             _cache[_keygen(patch_size, pool_op_kernel_sizes)] = estimate
+
+        # adapt for our vram target
+        reference = (
+            self.UNet_reference_val_2d
+            if len(spacing) == 2
+            else self.UNet_reference_val_3d
+        ) * (self.UNet_vram_target_GB / self.UNet_reference_val_corresp_GB)
+
+        # while estimate > reference:
+        #     # print(patch_size)
+        #     # patch size seems to be too large, so we need to reduce it. Reduce the axis that currently violates the
+        #     # aspect ratio the most (that is the largest relative to median shape)
+        #     axis_to_be_reduced = np.argsort([i / j for i, j in zip(patch_size, median_shape[:len(spacing)])])[-1]
+
+        #     # we cannot simply reduce that axis by shape_must_be_divisible_by[axis_to_be_reduced] because this
+        #     # may cause us to skip some valid sizes, for example shape_must_be_divisible_by is 64 for a shape of 256.
+        #     # If we subtracted that we would end up with 192, skipping 224 which is also a valid patch size
+        #     # (224 / 2**5 = 7; 7 < 2 * self.UNet_featuremap_min_edge_length(4) so it's valid). So we need to first
+        #     # subtract shape_must_be_divisible_by, then recompute it and then subtract the
+        #     # recomputed shape_must_be_divisible_by. Annoying.
+        #     patch_size = list(patch_size)
+        #     tmp = deepcopy(patch_size)
+        #     tmp[axis_to_be_reduced] -= shape_must_be_divisible_by[axis_to_be_reduced]
+        #     _, _, _, _, shape_must_be_divisible_by = \
+        #         get_pool_and_conv_props(spacing, tmp,
+        #                                 self.UNet_featuremap_min_edge_length,
+        #                                 999999)
+        #     patch_size[axis_to_be_reduced] -= shape_must_be_divisible_by[axis_to_be_reduced]
+
+        #     # now recompute topology
+        #     network_num_pool_per_axis, pool_op_kernel_sizes, conv_kernel_sizes, patch_size, \
+        #     shape_must_be_divisible_by = get_pool_and_conv_props(spacing, patch_size,
+        #                                                          self.UNet_featuremap_min_edge_length,
+        #                                                          999999)
+
+        #     num_stages = len(pool_op_kernel_sizes)
+        #     architecture_kwargs['arch_kwargs'].update({
+        #         'n_stages': num_stages,
+        #         'kernel_sizes': conv_kernel_sizes,
+        #         'strides': pool_op_kernel_sizes,
+        #         'features_per_stage': _features_per_stage(num_stages, max_num_features),
+        #         'n_blocks_per_stage': self.UNet_blocks_per_stage_encoder[:num_stages],
+        #         'n_conv_per_stage_decoder': self.UNet_blocks_per_stage_decoder[:num_stages - 1],
+        #     })
+        #     if _keygen(patch_size, pool_op_kernel_sizes) in _cache.keys():
+        #         estimate = _cache[_keygen(patch_size, pool_op_kernel_sizes)]
+        #     else:
+        #         estimate = self.static_estimate_VRAM_usage(
+        #             patch_size,
+        #             num_input_channels,
+        #             len(self.dataset_json['labels'].keys()),
+        #             architecture_kwargs['network_class_name'],
+        #             architecture_kwargs['arch_kwargs'],
+        #             architecture_kwargs['_kw_requires_import'],
+        #         )
+        #         _cache[_keygen(patch_size, pool_op_kernel_sizes)] = estimate
 
         # TODO: auto determine batch size
         batch_size = 2 if len(spacing) == 3 else 12
