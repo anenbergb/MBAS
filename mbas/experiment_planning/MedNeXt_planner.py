@@ -57,9 +57,10 @@ class MedNeXtPlanner(ExperimentPlanner):
         self.UNet_max_features_2d = 512
         self.UNet_max_features_3d = 320
         self.UNet_n_blocks_per_stage = (3, 4, 6, 6, 6, 6, 6, 6, 6, 6)
-        self.UNet_n_blocks_per_stage_decoder = (6, 6, 6, 6, 6, 6, 6, 4, 3)
+        # self.UNet_n_blocks_per_stage_decoder = (6, 6, 6, 6, 4, 3)
+        # self.UNet_n_blocks_per_stage_decoder = (3, 3, 3, 3, 3, 3, 3, 3, 3)
         self.UNet_exp_ratio_per_stage = (2, 3, 4, 4, 4, 4, 4, 4, 4, 4)
-        self.UNet_exp_ratio_per_stage_decoder = (4, 4, 4, 4, 4, 4, 4, 3, 2)
+        # self.UNet_exp_ratio_per_stage_decoder = (4, 4, 4, 4, 4, 4, 4, 3, 2)
 
         self.UNet_reference_val_2d = 2973327296  # IDK why this value
         self.UNet_reference_val_3d = 2973327296  # 2.77 GB
@@ -155,6 +156,12 @@ class MedNeXtPlanner(ExperimentPlanner):
 
         num_stages = len(pool_op_kernel_sizes)
 
+        n_blocks_per_stage = self.UNet_n_blocks_per_stage[:num_stages]
+        n_blocks_per_stage_decoder = n_blocks_per_stage[:-1][::-1]
+
+        exp_ratio_per_stage = self.UNet_exp_ratio_per_stage[:num_stages]
+        exp_ratio_per_stage_decoder = exp_ratio_per_stage[:-1][::-1]
+
         # ASSERT that that the first stride = 1
         assert pool_op_kernel_sizes[0] == (1,) * len(spacing)
         architecture_kwargs = {
@@ -166,14 +173,10 @@ class MedNeXtPlanner(ExperimentPlanner):
                 "stem_kernel_size": 1,
                 "kernel_sizes": conv_kernel_sizes,
                 "strides": pool_op_kernel_sizes,
-                "n_blocks_per_stage": self.UNet_n_blocks_per_stage[:num_stages],
-                "exp_ratio_per_stage": self.UNet_exp_ratio_per_stage[:num_stages],
-                "n_blocks_per_stage_decoder": self.UNet_n_blocks_per_stage_decoder[
-                    : num_stages - 1
-                ],
-                "exp_ratio_per_stage_decoder": self.UNet_exp_ratio_per_stage_decoder[
-                    : num_stages - 1
-                ],
+                "n_blocks_per_stage": n_blocks_per_stage,
+                "exp_ratio_per_stage": exp_ratio_per_stage,
+                "n_blocks_per_stage_decoder": n_blocks_per_stage_decoder,
+                "exp_ratio_per_stage_decoder": exp_ratio_per_stage_decoder,
                 "norm_type": "group",
                 "enable_affine_transform": False,
             },
