@@ -21,8 +21,9 @@ class MedNeXt(nn.Module):
         n_stages: int = 5,
         features_per_stage: List[int] = [32, 64, 128, 256, 512],
         conv_op: Type[_ConvNd] = nn.Conv3d,
-        kernel_size: int = 3,
-        # kernel_sizes: Union[int, List[int], Tuple[int, ...]],
+        kernel_sizes: Union[
+            int, List[int], Tuple[int, ...], Tuple[Tuple[int, ...], ...]
+        ] = 3,
         strides: Union[int, List[int], Tuple[int, ...]] = [1, 2, 2, 2, 2],
         n_blocks_per_stage: List[int] = [3, 4, 8, 8, 8],
         exp_ratio_per_stage: List[int] = [2, 3, 4, 4, 4],
@@ -59,7 +60,7 @@ class MedNeXt(nn.Module):
             n_stages=n_stages,
             features_per_stage=features_per_stage,
             conv_op=conv_op,
-            kernel_size=kernel_size,
+            kernel_sizes=kernel_sizes,
             strides=strides,
             n_blocks_per_stage=n_blocks_per_stage,
             exp_ratio_per_stage=exp_ratio_per_stage,
@@ -103,8 +104,10 @@ class MedNeXtEncoder(nn.Module):
         n_stages: int,
         features_per_stage: List[int],
         conv_op: Type[_ConvNd],
-        kernel_size: int,
-        strides: Union[int, List[int], Tuple[int, ...]],
+        kernel_sizes: Union[
+            int, List[int], Tuple[int, ...], Tuple[Tuple[int, ...], ...]
+        ],
+        strides: Union[int, List[int], Tuple[int, ...], Tuple[Tuple[int, ...], ...]],
         n_blocks_per_stage: List[int],
         exp_ratio_per_stage: List[int],
         return_skips: bool = False,
@@ -125,9 +128,14 @@ class MedNeXtEncoder(nn.Module):
 
         """
         super().__init__()
-
+        if isinstance(kernel_sizes, int):
+            kernel_sizes = [kernel_sizes] * n_stages
         if isinstance(strides, int):
             strides = [strides] * n_stages
+
+        assert (
+            len(kernel_sizes) == n_stages
+        ), "kernel_sizes must have as many entries as we have resolution stages (n_stages)"
         assert (
             len(features_per_stage) == n_stages
         ), "features_per_stage must have as many entries as we have resolution stages (n_stages)"
@@ -145,22 +153,22 @@ class MedNeXtEncoder(nn.Module):
         for i in range(n_stages):
             blocks = []
             if i == 0:
-                # TODO: update kernel size to be variable for the stem
-                # stride has to be 1 for stem
-                down_block = conv_op(
-                    input_channels,
-                    features_per_stage[i],
-                    kernel_size=1,
+                down_block = Stem(
+                    in_channels=input_channels,
+                    out_channels=features_per_stage[i],
+                    conv_op=conv_op,
+                    kernel_size=kernel_sizes[i],
                     stride=strides[i],
                     padding=0,
+                    norm_type=norm_type,
                 )
             else:
-                down_block = MedNeXtDownBlock(
+                down_block = MedNeXtBlock(
                     in_channels=input_channels,
                     out_channels=features_per_stage[i],
                     conv_op=conv_op,
                     exp_ratio=exp_ratio_per_stage[i],
-                    kernel_size=kernel_size,
+                    kernel_size=kernel_sizes[i],
                     stride=strides[i],
                     norm_type=norm_type,
                     enable_affine_transform=enable_affine_transform,
@@ -173,7 +181,8 @@ class MedNeXtEncoder(nn.Module):
                         out_channels=features_per_stage[i],
                         conv_op=conv_op,
                         exp_ratio=exp_ratio_per_stage[i],
-                        kernel_size=kernel_size,
+                        kernel_size=kernel_sizes[i],
+                        stride=1,
                         norm_type=norm_type,
                         enable_affine_transform=enable_affine_transform,
                     )
@@ -189,7 +198,7 @@ class MedNeXtEncoder(nn.Module):
         self.exp_ratio_per_stage = exp_ratio_per_stage
         # we store some things that a potential decoder needs
         self.conv_op = conv_op
-        self.kernel_size = kernel_size
+        self.kernel_sizes = kernel_sizes
         self.norm_type = norm_type
         self.enable_affine_transform = enable_affine_transform
 
@@ -207,14 +216,8 @@ class MedNeXtEncoder(nn.Module):
         output = np.int64(0)
         for i in range(len(self.stages)):
             for j, block in enumerate(self.stages[i]):
-                if isinstance(block, self.conv_op):
-                    output += np.prod([block.out_channels, *input_size])
-                else:
-                    output += block.compute_conv_feature_map_size(input_size)
+                output += block.compute_conv_feature_map_size(input_size)
                 if j == 0:  # first block is always the down block
-                    assert isinstance(block, MedNeXtDownBlock) or isinstance(
-                        block, self.conv_op
-                    )
                     input_size = [i // j for i, j in zip(input_size, self.strides[i])]
         return output
 
@@ -261,7 +264,6 @@ class MedNeXtDecoder(nn.Module):
         )
 
         conv_op = encoder.conv_op
-        kernel_size = encoder.kernel_size
         norm_type = encoder.norm_type
         enable_affine_transform = encoder.enable_affine_transform
 
@@ -284,18 +286,18 @@ class MedNeXtDecoder(nn.Module):
         for s in range(1, n_stages_encoder):
             input_features_below = encoder.output_channels[-s]
             input_features_skip = encoder.output_channels[-(s + 1)]
-            strides_for_upsample = encoder.strides[-s]
 
             self.up_blocks.append(
-                MedNeXtUpBlock(
+                MedNeXtBlock(
                     in_channels=input_features_below,
                     out_channels=input_features_skip,
                     conv_op=conv_op,
                     exp_ratio=exp_ratio_per_stage[s - 1],
-                    kernel_size=kernel_size,
-                    stride=strides_for_upsample,
+                    kernel_size=encoder.kernel_sizes[-s],
+                    stride=encoder.strides[-s],
                     norm_type=norm_type,
                     enable_affine_transform=enable_affine_transform,
+                    upsample=True,
                 )
             )
             stage = nn.Sequential(
@@ -305,7 +307,8 @@ class MedNeXtDecoder(nn.Module):
                         out_channels=input_features_skip,
                         conv_op=conv_op,
                         exp_ratio=exp_ratio_per_stage[s - 1],
-                        kernel_size=kernel_size,
+                        kernel_size=encoder.kernel_sizes[-(s + 1)],
+                        stride=1,
                         norm_type=norm_type,
                         enable_affine_transform=enable_affine_transform,
                     )
@@ -387,6 +390,7 @@ class MedNeXtDecoder(nn.Module):
 if __name__ == "__main__":
 
     strides = [(1, 1, 1), (1, 2, 2), (2, 2, 2), (2, 2, 2), (2, 2, 2)]
+    kernels = [1, 3, 3, 3, 3]
     network = MedNeXt(
         input_channels=1,
         strides=strides,

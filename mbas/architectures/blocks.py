@@ -12,6 +12,57 @@ from dynamic_network_architectures.building_blocks.helper import (
 )
 
 
+class Stem(nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        conv_op: Type[_ConvNd] = nn.Conv3d,
+        kernel_size: Union[int, List[int], Tuple[int, ...]] = 3,
+        stride: Union[int, List[int], Tuple[int, ...]] = 1,
+        padding: int = 0,
+        norm_type: str = "group",
+        n_groups: int | None = None,
+    ):
+        """
+        MedNeXt stem is just Conv w/ kernel=1, stride=1, padding=0
+        Original ConvNeXt stem is Conv w/ kernel=4, stride=4, padding=0
+        """
+        super().__init__()
+
+        self.conv1 = conv_op(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+        )
+        self.n_groups = out_channels if n_groups is None else n_groups
+        if norm_type == "group":
+            self.norm = nn.GroupNorm(
+                num_groups=self.n_groups, num_channels=out_channels
+            )
+        elif norm_type == "layer":
+            self.norm = LayerNorm(
+                normalized_shape=out_channels, data_format="channels_first"
+            )
+
+        self.conv_dim = convert_conv_op_to_dim(conv_op)
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.norm(out)
+        return out
+
+    def compute_conv_feature_map_size(self, input_size):
+        assert len(input_size) == self.conv_dim, (
+            "just give the image size without color/feature channels or "
+            "batch channel. Do not give input_size=(b, c, x, y(, z)). "
+            "Give input_size=(x, y(, z))!"
+        )
+        return np.prod([self.conv1.out_channels, *input_size], dtype=np.int64)
+
+
 class MedNeXtBlock(nn.Module):
 
     def __init__(
@@ -20,33 +71,39 @@ class MedNeXtBlock(nn.Module):
         out_channels: int,
         conv_op: Type[_ConvNd] = nn.Conv3d,
         exp_ratio: int = 4,
-        kernel_size: int = 7,
+        kernel_size: Union[int, List[int], Tuple[int, ...]] = 5,
+        stride: Union[int, List[int], Tuple[int, ...]] = 1,
         norm_type: str = "group",
         n_groups: int | None = None,
         enable_affine_transform: bool = False,
         enable_residual: bool = True,
+        upsample: bool = False,
     ):
         super().__init__()
         """
         TODO: Double check the implementation of LayerNorm
         
         """
-
+        self.stride = maybe_convert_scalar_to_list(conv_op, stride)
+        kernel_size = maybe_convert_scalar_to_list(conv_op, kernel_size)
         self.n_groups = in_channels if n_groups is None else n_groups
 
+        conv1_op = get_matching_convtransp(conv_op) if upsample else conv_op
         # First convolution layer with DepthWise Convolutions
-        self.conv1 = conv_op(
+        self.conv1 = conv1_op(
             in_channels=in_channels,
             out_channels=in_channels,
             kernel_size=kernel_size,
-            stride=1,
-            padding=kernel_size // 2,
+            stride=self.stride,
+            padding=[(i - 1) // 2 for i in kernel_size],
+            dilation=1,
             groups=self.n_groups,
         )
 
         # Normalization Layer. GroupNorm is used by default.
+        # original MedNeXt implementation has num_groups=in_channels
         if norm_type == "group":
-            norm = nn.GroupNorm(num_groups=in_channels, num_channels=in_channels)
+            norm = nn.GroupNorm(num_groups=self.n_groups, num_channels=in_channels)
         elif norm_type == "layer":
             norm = LayerNorm(normalized_shape=in_channels, data_format="channels_first")
 
@@ -69,7 +126,29 @@ class MedNeXtBlock(nn.Module):
             padding=0,
         )
 
+        # MedNeXt block has residual connection with no res_conv
+        # because stride = 1 and in_channels = out_channels
+        self.enable_residual = enable_residual
+        self.res_conv = None
+        if np.prod(self.stride) > 1 or in_channels != out_channels:
+            self.res_conv = conv1_op(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=1,
+                stride=stride,
+                padding=0,
+            )
+            self.enable_residual = True
+
         self.conv_dim = convert_conv_op_to_dim(conv_op)
+
+        self.zero_pad = None
+        if upsample and np.prod(self.stride) > 1:
+            padding = self.compute_padding_from_stride(self.stride)
+            if self.conv_dim == 3:
+                self.zero_pad = nn.ZeroPad3d(padding)
+            elif self.conv_dim == 2:
+                self.zero_pad = nn.ZeroPad2d(padding)
 
         if enable_affine_transform:
             if self.conv_dim == 3:
@@ -86,8 +165,9 @@ class MedNeXtBlock(nn.Module):
                 self.grn_gamma = nn.Parameter(
                     torch.zeros(1, exp_ratio * in_channels, 1, 1), requires_grad=True
                 )
+
+        self.upsample = upsample
         self.enable_affine_transform = enable_affine_transform
-        self.enable_residual = enable_residual
 
     def apply_affine_transform(self, x):
         """
@@ -102,147 +182,10 @@ class MedNeXtBlock(nn.Module):
         x = self.grn_gamma * (x * nx) + self.grn_beta + x
         return x
 
-    def forward(self, x):
-        out = self.conv1(x)
-        out = self.norm_conv2_act(out)
-        if self.enable_affine_transform:
-            out = self.apply_affine_transform(out)
-        out = self.conv3(out)
-        if self.enable_residual:
-            out = out + x
-        return out
-
-    def compute_conv_feature_map_size(self, input_size):
-        assert len(input_size) == self.conv_dim, (
-            "just give the image size without color/feature channels or "
-            "batch channel. Do not give input_size=(b, c, x, y(, z)). "
-            "Give input_size=(x, y(, z))!"
-        )
-        conv1_size = np.prod([self.conv1.out_channels, *input_size])
-        conv2_size = np.prod([self.norm_conv2_act[1].out_channels, *input_size])
-        conv3_size = np.prod([self.conv3.out_channels, *input_size])
-        return conv1_size + conv2_size + conv3_size
-
-
-class MedNeXtDownBlock(MedNeXtBlock):
-
-    def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        conv_op: Type[_ConvNd] = nn.Conv3d,
-        exp_ratio: int = 4,
-        kernel_size: int = 7,
-        stride: Union[int, List[int], Tuple[int, ...]] = 2,
-        norm_type: str = "group",
-        n_groups: int | None = None,
-        enable_affine_transform: bool = False,
-    ):
-
-        super().__init__(
-            in_channels,
-            out_channels,
-            conv_op,
-            exp_ratio,
-            kernel_size,
-            norm_type,
-            n_groups,
-            enable_affine_transform,
-            enable_residual=False,
-        )
-        stride = maybe_convert_scalar_to_list(conv_op, stride)
-        self.stride = stride
-        kernel_size = maybe_convert_scalar_to_list(conv_op, kernel_size)
-
-        self.conv1 = conv_op(
-            in_channels=in_channels,
-            out_channels=in_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=[(i - 1) // 2 for i in kernel_size],
-            dilation=1,
-            groups=self.n_groups,
-        )
-        self.res_conv = conv_op(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=1,
-            stride=stride,
-            padding=0,
-        )
-
-    def forward(self, x):
-        return super().forward(x) + self.res_conv(x)
-
-    def compute_conv_feature_map_size(self, input_size):
-        assert len(input_size) == self.conv_dim, (
-            "just give the image size without color/feature channels or "
-            "batch channel. Do not give input_size=(b, c, x, y(, z)). "
-            "Give input_size=(x, y(, z))!"
-        )
-        output_size = [i // j for i, j in zip(input_size, self.stride)]
-        conv1_size = np.prod([self.conv1.out_channels, *output_size])
-        conv2_size = np.prod([self.norm_conv2_act[1].out_channels, *output_size])
-        conv3_size = np.prod([self.conv3.out_channels, *output_size])
-        res_conv_size = np.prod([self.res_conv.out_channels, *output_size])
-        return conv1_size + conv2_size + conv3_size + res_conv_size
-
-
-class MedNeXtUpBlock(MedNeXtBlock):
-
-    def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        conv_op: Type[_ConvNd] = nn.Conv3d,
-        exp_ratio: int = 4,
-        kernel_size: int = 7,
-        stride: Union[int, List[int], Tuple[int, ...]] = 2,
-        norm_type: str = "group",
-        n_groups: int | None = None,
-        enable_affine_transform: bool = False,
-    ):
-
-        super().__init__(
-            in_channels,
-            out_channels,
-            conv_op,
-            exp_ratio,
-            kernel_size,
-            norm_type,
-            n_groups,
-            enable_affine_transform,
-            enable_residual=False,
-        )
-        stride = maybe_convert_scalar_to_list(conv_op, stride)
-        self.stride = stride
-        kernel_size = maybe_convert_scalar_to_list(conv_op, kernel_size)
-
-        conv_trans_op = get_matching_convtransp(conv_op)
-        self.conv1 = conv_trans_op(
-            in_channels=in_channels,
-            out_channels=in_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=[(i - 1) // 2 for i in kernel_size],
-            dilation=1,
-            groups=self.n_groups,
-        )
-        self.res_conv = conv_trans_op(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=1,
-            stride=stride,
-            padding=0,
-        )
-        padding = self.compute_padding_from_stride(stride)
-        if self.conv_dim == 3:
-            self.zero_pad = nn.ZeroPad3d(padding)
-        elif self.conv_dim == 2:
-            self.zero_pad = nn.ZeroPad2d(padding)
-
     def compute_padding_from_stride(self, stride):
         """
+        Useful for padding the tensors after ConvTranspose
+
         stride is ordered as (D, H, W)
         The padding 6-tuple should be ordered as
         (padding_left, padding_right, padding_top, padding_bottom, padding_front, padding_back)
@@ -260,7 +203,22 @@ class MedNeXtUpBlock(MedNeXtBlock):
         return padding
 
     def forward(self, x):
-        return self.zero_pad(super().forward(x)) + self.zero_pad(self.res_conv(x))
+        out = self.conv1(x)
+        out = self.norm_conv2_act(out)
+        if self.enable_affine_transform:
+            out = self.apply_affine_transform(out)
+        out = self.conv3(out)
+        if self.zero_pad is not None:
+            out = self.zero_pad(out)
+        if self.res_conv is not None:
+            out += (
+                self.res_conv(x)
+                if self.zero_pad is None
+                else self.zero_pad(self.res_conv(x))
+            )
+        elif self.enable_residual:
+            out += x
+        return out
 
     def compute_conv_feature_map_size(self, input_size):
         assert len(input_size) == self.conv_dim, (
@@ -268,12 +226,22 @@ class MedNeXtUpBlock(MedNeXtBlock):
             "batch channel. Do not give input_size=(b, c, x, y(, z)). "
             "Give input_size=(x, y(, z))!"
         )
-        output_size = [i * j for i, j in zip(input_size, self.stride)]
-        conv1_size = np.prod([self.conv1.out_channels, *output_size])
-        conv2_size = np.prod([self.norm_conv2_act[1].out_channels, *output_size])
-        conv3_size = np.prod([self.conv3.out_channels, *output_size])
-        res_conv_size = np.prod([self.res_conv.out_channels, *output_size])
-        return conv1_size + conv2_size + conv3_size + res_conv_size
+        output = np.int64(0)
+        output_size = (
+            [i * j for i, j in zip(input_size, self.stride)]
+            if self.upsample
+            else [i // j for i, j in zip(input_size, self.stride)]
+        )
+        output += np.prod([self.conv1.out_channels, *output_size], dtype=np.int64)
+        output += np.prod(
+            [self.norm_conv2_act[1].out_channels, *output_size], dtype=np.int64
+        )
+        output += np.prod([self.conv3.out_channels, *output_size], dtype=np.int64)
+        if self.res_conv is not None:
+            output += np.prod(
+                [self.res_conv.out_channels, *output_size], dtype=np.int64
+            )
+        return output
 
 
 class LayerNorm(nn.Module):
