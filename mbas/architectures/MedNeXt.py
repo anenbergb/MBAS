@@ -341,7 +341,12 @@ class MedNeXtDecoder(nn.Module):
         for s in range(len(self.stages)):
             x_up = self.up_blocks[s](x)
             x_skip = skips[-(s + 2)]
-            x = x_up + x_skip
+            try:
+                x = x_up + x_skip
+            except RuntimeError as e:
+                import ipdb
+
+                ipdb.set_trace()
             x = self.stages[s](x)
             if self.deep_supervision or s == (len(self.stages) - 1):
                 seg_outputs.append(self.seg_layers[s + 1](x))
@@ -393,6 +398,7 @@ if __name__ == "__main__":
     kernels = [1, 3, 3, 3, 3]
     network = MedNeXt(
         input_channels=1,
+        kernel_sizes=kernels,
         strides=strides,
         deep_supervision=True,
     ).cuda()

@@ -30,6 +30,12 @@ class Stem(nn.Module):
         """
         super().__init__()
 
+        kernel_size = tuple(maybe_convert_scalar_to_list(conv_op, kernel_size))
+        stride = tuple(maybe_convert_scalar_to_list(conv_op, stride))
+        assert (
+            kernel_size == stride
+        ), f"Kernel size {kernel_size} and stride {stride} must be equal in the Stem!"
+
         self.conv1 = conv_op(
             in_channels=in_channels,
             out_channels=out_channels,
