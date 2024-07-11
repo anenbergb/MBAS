@@ -39,3 +39,10 @@ export nnUNet_results="/home/bryan/expr/mbas_nnUNet_results"
 nnUNetv2_plan_and_preprocess -d 101 -pl MedNeXtPlanner -gpu_memory_target 24
 # nnUNetv2_plan_experiment -d 101 -pl MedNeXtPlanner -gpu_memory_target 24
 nnUNetv2_train 101 3d_fullres all -tr nnUNetTrainer_MedNeXt -p MedNeXtPlans
+
+
+# nnUNetv2_predict \
+# -i "${nnUNet_raw}/Dataset101_MBAS/imagesTs" \
+# -o "${nnUNet_results}/Dataset101_MBAS/nnUNetTrainer_MedNeXt__MedNeXtPlans__3d_fullres/fold_all/validation_71_100" \
+# -d 101 -c 3d_fullres -f all -tr nnUNetTrainer_MedNeXt -p MedNeXtPlans \
+# --verbose -npp 16 -nps 16

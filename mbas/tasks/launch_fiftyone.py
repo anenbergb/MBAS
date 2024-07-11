@@ -148,15 +148,15 @@ def add_predictions_to_samples(
 def launch_fiftyone(
     data_dir,
     dataset_name,
-    predictions_dir=None,
+    predictions_dir=[],
     predictions_name=None,
 ):
     train_folders = sorted(get_subject_folders(os.path.join(data_dir, "Training")))
     val_folders = sorted(get_subject_folders(os.path.join(data_dir, "Validation")))
     samples = create_samples(train_folders, "train")
     samples += create_samples(val_folders, "validation")
-    if predictions_dir:
-        samples = add_predictions_to_samples(samples, predictions_dir, predictions_name)
+    for p_dir in predictions_dir:
+        samples = add_predictions_to_samples(samples, p_dir, predictions_name)
 
     # samples = samples[:5]
     dataset = fo.Dataset(dataset_name)
@@ -187,6 +187,8 @@ Render video for each subject
         "-p",
         "--predictions-dir",
         type=str,
+        nargs="+",
+        default=[],
     )
     parser.add_argument(
         "--predictions-name",
