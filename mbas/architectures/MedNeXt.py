@@ -339,7 +339,7 @@ class MedNeXtDecoder(nn.Module):
                     out_channels=input_features_below,
                     conv_op=conv_op,
                     exp_ratio=exp_ratio_per_stage[n_stages_encoder - 1],
-                    kernel_size=encoder.stem_kernel_size,
+                    kernel_size=decode_stem_kernel_size,
                     stride=encoder.strides[-n_stages_encoder],
                     norm_type=norm_type,
                     enable_affine_transform=enable_affine_transform,
@@ -456,7 +456,7 @@ class MedNeXtDecoder(nn.Module):
 if __name__ == "__main__":
 
     strides = [
-        (1, 1, 1),
+        (2, 2, 2),
         (1, 2, 2),
         (1, 2, 2),
         (2, 2, 2),
@@ -468,14 +468,15 @@ if __name__ == "__main__":
         input_channels=1,
         n_stages=7,
         features_per_stage=[32, 64, 128, 256, 320, 320, 320],
-        stem_kernel_size=1,
+        stem_kernel_size=2,
         kernel_sizes=[3, 3, 3, 3, 3, 3, 3],
         strides=strides,
         n_blocks_per_stage=[3, 4, 6, 6, 6, 6, 6],
         exp_ratio_per_stage=[2, 3, 4, 4, 4, 4, 4],
-        n_blocks_per_stage_decoder=[6, 6, 6, 6, 4, 3],
-        exp_ratio_per_stage_decoder=[4, 4, 4, 4, 3, 2],
+        n_blocks_per_stage_decoder=[6, 6, 6, 6, 4, 3, 3],
+        exp_ratio_per_stage_decoder=[4, 4, 4, 4, 3, 2, 2],
         deep_supervision=True,
+        decode_stem_kernel_size=3,
     ).cuda()
 
     def count_parameters(model):
