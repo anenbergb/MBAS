@@ -36,10 +36,14 @@ export nnUNet_results="/home/bryan/expr/mbas_nnUNet_results"
 
 
 # Experiment # 3 (variable kernel size)
-nnUNetv2_plan_and_preprocess -d 101 -pl MedNeXtPlanner -gpu_memory_target 24
+# nnUNetv2_plan_and_preprocess -d 101 -pl MedNeXtPlanner -gpu_memory_target 24
 # nnUNetv2_plan_experiment -d 101 -pl MedNeXtPlanner -gpu_memory_target 24
-nnUNetv2_train 101 3d_fullres all -tr nnUNetTrainer_MedNeXt -p MedNeXtPlans
-
+# nnUNetv2_train 101 3d_fullres all -tr nnUNetTrainer_MedNeXt -p MedNeXtPlans
+# nnUNetv2_train 101 3d_fullres 0 -tr nnUNetTrainer_MedNeXt -p MedNeXtPlans
+# nnUNetv2_train 101 3d_fullres 1 -tr nnUNetTrainer_MedNeXt -p MedNeXtPlans --c
+# nnUNetv2_train 101 3d_fullres 2 -tr nnUNetTrainer_MedNeXt -p MedNeXtPlans --c
+nnUNetv2_train 101 3d_fullres 3 -tr nnUNetTrainer_MedNeXt -p MedNeXtPlans --c
+# nnUNetv2_train 101 3d_fullres 4 -tr nnUNetTrainer_MedNeXt -p MedNeXtPlans
 
 # nnUNetv2_predict \
 # -i "${nnUNet_raw}/Dataset101_MBAS/imagesTs" \

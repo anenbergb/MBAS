@@ -34,6 +34,7 @@ class MedNeXt(nn.Module):
         deep_supervision: bool = False,
         norm_type: str = "group",
         enable_affine_transform: bool = False,
+        decode_stem_kernel_size: Union[int, List[int], Tuple[int, ...]] = 1,
     ):
         """
 
@@ -48,13 +49,8 @@ class MedNeXt(nn.Module):
             f"n_blocks_per_stage: {n_blocks_per_stage}"
         )
         assert len(exp_ratio_per_stage) == n_stages
-        assert len(n_blocks_per_stage_decoder) == (n_stages - 1), (
-            "n_blocks_per_stage_decoder must have one less entries "
-            f"as we have resolution stages. here: {n_stages} "
-            f"stages, so it should have {n_stages - 1} entries. "
-            f"n_blocks_per_stage_decoder: {n_blocks_per_stage_decoder}"
-        )
-        assert len(exp_ratio_per_stage_decoder) == (n_stages - 1)
+        assert len(n_blocks_per_stage_decoder) == n_stages
+        assert len(exp_ratio_per_stage_decoder) == n_stages
 
         self.encoder = MedNeXtEncoder(
             input_channels=input_channels,
@@ -76,6 +72,7 @@ class MedNeXt(nn.Module):
             n_blocks_per_stage=n_blocks_per_stage_decoder,
             exp_ratio_per_stage=exp_ratio_per_stage_decoder,
             deep_supervision=deep_supervision,
+            decode_stem_kernel_size=decode_stem_kernel_size,
         )
         # Used to fix PyTorch checkpointing bug
         # self.dummy_tensor = nn.Parameter(torch.tensor([1.0]), requires_grad=True)
@@ -171,7 +168,7 @@ class MedNeXtEncoder(nn.Module):
                     out_channels=features_per_stage[i],
                     conv_op=conv_op,
                     exp_ratio=exp_ratio_per_stage[i],
-                    kernel_size=stem_kernel_size,
+                    kernel_size=kernel_sizes[i],
                     stride=strides[i],
                     norm_type=norm_type,
                     enable_affine_transform=enable_affine_transform,
@@ -200,6 +197,7 @@ class MedNeXtEncoder(nn.Module):
         self.n_blocks_per_stage = n_blocks_per_stage
         self.exp_ratio_per_stage = exp_ratio_per_stage
         # we store some things that a potential decoder needs
+        self.stem_kernel_size = stem_kernel_size
         self.conv_op = conv_op
         self.kernel_sizes = kernel_sizes
         self.norm_type = norm_type
@@ -233,6 +231,7 @@ class MedNeXtDecoder(nn.Module):
         n_blocks_per_stage: List[int],
         exp_ratio_per_stage: List[int],
         deep_supervision: bool = True,
+        decode_stem_kernel_size: Union[int, List[int], Tuple[int, ...]] = 1,
     ):
         """
         This class needs the skips of the encoder as input in its forward.
@@ -255,14 +254,14 @@ class MedNeXtDecoder(nn.Module):
         self.num_classes = num_classes
         n_stages_encoder = len(encoder.output_channels)
 
-        assert len(n_blocks_per_stage) == n_stages_encoder - 1, (
+        assert len(n_blocks_per_stage) == n_stages_encoder, (
             "n_blocks_per_stage must have as many entries as we have "
-            "resolution stages - 1 (n_stages in encoder - 1), "
+            "resolution stages (n_stages in encoder), "
             f"here: {n_stages_encoder}"
         )
-        assert len(exp_ratio_per_stage) == n_stages_encoder - 1, (
+        assert len(exp_ratio_per_stage) == n_stages_encoder, (
             "exp_ratio_per_stage must have as many entries as we have "
-            "resolution stages - 1 (n_stages in encoder - 1), "
+            "resolution stages (n_stages in encoder), "
             f"here: {n_stages_encoder}"
         )
 
@@ -329,7 +328,47 @@ class MedNeXtDecoder(nn.Module):
                     bias=True,
                 )
             )
+        # determine if the stem downsampled the input, so we know what factor to upsample by
+        self.decode_stem_seg = None
+        stride0_set = set(encoder.strides[0])
+        if len(stride0_set) > 1 or stride0_set.pop() != 1:
+            input_features_below = encoder.output_channels[-n_stages_encoder]
+            self.decode_stem_seg = nn.Sequential(
+                MedNeXtBlock(
+                    in_channels=input_features_below,
+                    out_channels=input_features_below,
+                    conv_op=conv_op,
+                    exp_ratio=exp_ratio_per_stage[n_stages_encoder - 1],
+                    kernel_size=decode_stem_kernel_size,
+                    stride=encoder.strides[-n_stages_encoder],
+                    norm_type=norm_type,
+                    enable_affine_transform=enable_affine_transform,
+                    upsample=True,
+                ),
+                *[
+                    MedNeXtBlock(
+                        in_channels=input_features_below,
+                        out_channels=input_features_below,
+                        conv_op=conv_op,
+                        exp_ratio=exp_ratio_per_stage[n_stages_encoder - 1],
+                        kernel_size=decode_stem_kernel_size,
+                        stride=1,
+                        norm_type=norm_type,
+                        enable_affine_transform=enable_affine_transform,
+                    )
+                    for _ in range(n_blocks_per_stage[n_stages_encoder - 1])
+                ],
+                encoder.conv_op(
+                    input_features_below,
+                    num_classes,
+                    kernel_size=1,
+                    stride=1,
+                    padding=0,
+                    bias=True,
+                ),
+            )
 
+        self.decode_stem_kernel_size = decode_stem_kernel_size
         self.n_blocks_per_stage = n_blocks_per_stage
         self.exp_ratio_per_stage = exp_ratio_per_stage
 
@@ -344,15 +383,16 @@ class MedNeXtDecoder(nn.Module):
         for s in range(len(self.stages)):
             x_up = self.up_blocks[s](x)
             x_skip = skips[-(s + 2)]
-            try:
-                x = x_up + x_skip
-            except RuntimeError as e:
-                import ipdb
-
-                ipdb.set_trace()
+            x = x_up + x_skip
             x = self.stages[s](x)
-            if self.deep_supervision or s == (len(self.stages) - 1):
+            if self.deep_supervision:
                 seg_outputs.append(self.seg_layers[s + 1](x))
+
+        if self.decode_stem_seg is None and not self.deep_supervision:
+            seg_outputs.append(self.seg_layers[-1](x))
+
+        if self.decode_stem_seg is not None:
+            seg_outputs.append(self.decode_stem_seg(x))
 
         # invert seg outputs so that the largest segmentation prediction is returned first
         seg_outputs = seg_outputs[::-1]
@@ -366,12 +406,13 @@ class MedNeXtDecoder(nn.Module):
         """
         IMPORTANT: input_size is the input_size of the encoder!
         """
+        downsampled_size = input_size
         skip_sizes = []
         for s in range(len(self.encoder.strides)):
             skip_sizes.append(
-                [i // j for i, j in zip(input_size, self.encoder.strides[s])]
+                [i // j for i, j in zip(downsampled_size, self.encoder.strides[s])]
             )
-            input_size = skip_sizes[-1]
+            downsampled_size = skip_sizes[-1]
 
         output = np.int64(0)
         if self.deep_supervision:
@@ -386,19 +427,36 @@ class MedNeXtDecoder(nn.Module):
             )
             for block in self.stages[s]:
                 output += block.compute_conv_feature_map_size(skip_sizes[-(s + 2)])
-            if self.deep_supervision or s == (len(self.stages) - 1):
+            if self.deep_supervision:
                 output += np.prod(
                     [self.seg_layers[s + 1].out_channels, *skip_sizes[-(s + 2)]],
                     dtype=np.int64,
                 )
-
+        if self.decode_stem_seg is None and not self.deep_supervision:
+            output += np.prod(
+                [self.seg_layers[-1].out_channels, *skip_sizes[0]],
+                dtype=np.int64,
+            )
+        if self.decode_stem_seg is not None:
+            output += self.decode_stem_seg[0].compute_conv_feature_map_size(
+                skip_sizes[0]
+            )
+            decode_stem_len = len(self.decode_stem_seg)
+            for i in range(1, decode_stem_len - 1):
+                output += self.decode_stem_seg[i].compute_conv_feature_map_size(
+                    input_size
+                )
+            output += np.prod(
+                [self.decode_stem_seg[-1].out_channels, *input_size],
+                dtype=np.int64,
+            )
         return output
 
 
 if __name__ == "__main__":
 
     strides = [
-        (1, 1, 1),
+        (2, 2, 2),
         (1, 2, 2),
         (1, 2, 2),
         (2, 2, 2),
@@ -410,14 +468,15 @@ if __name__ == "__main__":
         input_channels=1,
         n_stages=7,
         features_per_stage=[32, 64, 128, 256, 320, 320, 320],
-        stem_kernel_size=1,
+        stem_kernel_size=2,
         kernel_sizes=[3, 3, 3, 3, 3, 3, 3],
         strides=strides,
         n_blocks_per_stage=[3, 4, 6, 6, 6, 6, 6],
         exp_ratio_per_stage=[2, 3, 4, 4, 4, 4, 4],
-        n_blocks_per_stage_decoder=[6, 6, 6, 6, 4, 3],
-        exp_ratio_per_stage_decoder=[4, 4, 4, 4, 3, 2],
+        n_blocks_per_stage_decoder=[6, 6, 6, 6, 4, 3, 3],
+        exp_ratio_per_stage_decoder=[4, 4, 4, 4, 3, 2, 2],
         deep_supervision=True,
+        decode_stem_kernel_size=3,
     ).cuda()
 
     def count_parameters(model):
