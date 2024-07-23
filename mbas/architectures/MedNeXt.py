@@ -35,6 +35,8 @@ class MedNeXt(nn.Module):
         norm_type: str = "group",
         enable_affine_transform: bool = False,
         decode_stem_kernel_size: Union[int, List[int], Tuple[int, ...]] = 1,
+        override_down_kernel_size: bool = False,
+        down_kernel_size: Union[int, List[int], Tuple[int, ...]] = 1,
     ):
         """
 
@@ -65,6 +67,8 @@ class MedNeXt(nn.Module):
             return_skips=True,
             norm_type=norm_type,
             enable_affine_transform=enable_affine_transform,
+            override_down_kernel_size=override_down_kernel_size,
+            down_kernel_size=down_kernel_size,
         )
         self.decoder = MedNeXtDecoder(
             encoder=self.encoder,
@@ -113,6 +117,8 @@ class MedNeXtEncoder(nn.Module):
         return_skips: bool = False,
         norm_type: str = "group",
         enable_affine_transform: bool = False,
+        override_down_kernel_size: bool = False,
+        down_kernel_size: Union[int, List[int], Tuple[int, ...]] = 1,
     ):
         """
         The first stage is the stem
@@ -163,12 +169,15 @@ class MedNeXtEncoder(nn.Module):
                     norm_type=norm_type,
                 )
             else:
+                down_kernel = (
+                    down_kernel_size if override_down_kernel_size else kernel_sizes[i]
+                )
                 down_block = MedNeXtBlock(
                     in_channels=input_channels,
                     out_channels=features_per_stage[i],
                     conv_op=conv_op,
                     exp_ratio=exp_ratio_per_stage[i],
-                    kernel_size=kernel_sizes[i],
+                    kernel_size=down_kernel,
                     stride=strides[i],
                     norm_type=norm_type,
                     enable_affine_transform=enable_affine_transform,
@@ -202,6 +211,8 @@ class MedNeXtEncoder(nn.Module):
         self.kernel_sizes = kernel_sizes
         self.norm_type = norm_type
         self.enable_affine_transform = enable_affine_transform
+        self.override_down_kernel_size = override_down_kernel_size
+        self.down_kernel_size = down_kernel_size
 
     def forward(self, x):
         features = []

@@ -9,6 +9,7 @@ import numpy as np
 from collections import defaultdict
 import pandas as pd
 import torchio as tio
+from tabulate import tabulate
 
 from monai.metrics import HausdorffDistanceMetric, DiceMetric
 from monai.transforms import AsDiscrete, Compose
@@ -55,6 +56,17 @@ def per_subject_metrics(train_dir, results_dir, save_filepath):
     df = pd.DataFrame.from_records(metrics_dict)
     os.makedirs(os.path.dirname(save_filepath), exist_ok=True)
     df.to_pickle(save_filepath)
+
+    metric_columns = [
+        x for x in df.columns if x.startswith("DSC") or x.startswith("HD95")
+    ]
+    avg_df = pd.DataFrame(
+        {
+            "Average": df[metric_columns].mean(),
+            "STD": df[metric_columns].std(),
+        }
+    )
+    print(tabulate(avg_df, headers="keys", tablefmt="github"))
 
 
 def get_args() -> argparse.Namespace:
