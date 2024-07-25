@@ -44,6 +44,7 @@ class nnUNetTrainer_MedNeXt_CE_DC_HD(nnUNetTrainer_MedNeXt):
             ce_kwargs={},
             weight_ce=lambda_ce,
             weight_dice=lambda_dice,
+            weight_hd=lambda_hd,
             ignore_label=self.label_manager.ignore_label,
             dice_class=MemoryEfficientSoftDiceLoss,
         )

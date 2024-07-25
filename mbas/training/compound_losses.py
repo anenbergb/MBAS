@@ -4,6 +4,8 @@ from nnunetv2.training.loss.robust_ce_loss import RobustCrossEntropyLoss, TopKLo
 from nnunetv2.utilities.helpers import softmax_helper_dim1
 from torch import nn
 
+from monai.losses import HausdorffDTLoss
+
 
 class DC_CE_HD_loss(nn.Module):
     def __init__(
@@ -12,6 +14,7 @@ class DC_CE_HD_loss(nn.Module):
         ce_kwargs,
         weight_ce=1,
         weight_dice=1,
+        weight_hd=1,
         ignore_label=None,
         dice_class=SoftDiceLoss,
     ):
@@ -30,10 +33,22 @@ class DC_CE_HD_loss(nn.Module):
 
         self.weight_dice = weight_dice
         self.weight_ce = weight_ce
+        self.weight_hd = weight_hd
         self.ignore_label = ignore_label
 
         self.ce = RobustCrossEntropyLoss(**ce_kwargs)
         self.dc = dice_class(apply_nonlin=softmax_helper_dim1, **soft_dice_kwargs)
+
+        self.hd = HausdorffDTLoss(
+            alpha=2.0,
+            include_background=False,
+            to_onehot_y=True,
+            sigmoid=False,
+            softmax=False,
+            other_act=None,
+            reduction="mean",
+            batch=False,
+        )
 
     def forward(self, net_output: torch.Tensor, target: torch.Tensor):
         """
@@ -41,6 +56,9 @@ class DC_CE_HD_loss(nn.Module):
         :param net_output:
         :param target:
         :return:
+
+        net_output: torch.Size([2, 4, 16, 256, 256])
+        target: torch.Size([2, 1, 16, 256, 256])
         """
         if self.ignore_label is not None:
             assert target.shape[1] == 1, (
@@ -66,6 +84,11 @@ class DC_CE_HD_loss(nn.Module):
             if self.weight_ce != 0 and (self.ignore_label is None or num_fg > 0)
             else 0
         )
+        hd_loss = self.hd(net_output, target) if self.weight_hd != 0 else 0
 
-        result = self.weight_ce * ce_loss + self.weight_dice * dc_loss
+        result = (
+            self.weight_ce * ce_loss
+            + self.weight_dice * dc_loss
+            + self.weight_hd * hd_loss
+        )
         return result
