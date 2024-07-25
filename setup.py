@@ -36,6 +36,8 @@ setup(
         "ray[tune]",
         "scikit-learn"
         "tabulate",
+        "cucim-cu12",
+        "cupy",
     ],
     extras_require={
         "torch": [
