@@ -14,7 +14,6 @@ class DC_CE_HD_loss(nn.Module):
         ce_kwargs,
         weight_ce=1,
         weight_dice=1,
-        weight_hd=1,
         ignore_label=None,
         dice_class=SoftDiceLoss,
     ):
@@ -33,7 +32,6 @@ class DC_CE_HD_loss(nn.Module):
 
         self.weight_dice = weight_dice
         self.weight_ce = weight_ce
-        self.weight_hd = weight_hd
         self.ignore_label = ignore_label
 
         self.ce = RobustCrossEntropyLoss(**ce_kwargs)
@@ -44,17 +42,23 @@ class DC_CE_HD_loss(nn.Module):
             include_background=False,
             to_onehot_y=True,
             sigmoid=False,
-            softmax=False,
+            softmax=True,
             other_act=None,
             reduction="mean",
             batch=False,
         )
+        self.set_alpha()
+
+    def set_alpha(self, alpha: float = 1.0):
+        assert alpha >= 0 and alpha <= 1, "alpha must be in [0, 1]"
+        self.alpha = alpha
 
     def forward(self, net_output: torch.Tensor, target: torch.Tensor):
         """
         target must be b, c, x, y(, z) with c=1
         :param net_output:
         :param target:
+        :param alpha:
         :return:
 
         net_output: torch.Size([2, 4, 16, 256, 256])
@@ -84,11 +88,14 @@ class DC_CE_HD_loss(nn.Module):
             if self.weight_ce != 0 and (self.ignore_label is None or num_fg > 0)
             else 0
         )
-        hd_loss = self.hd(net_output, target) if self.weight_hd != 0 else 0
+        hd_loss = self.hd(net_output, target)
 
-        result = (
-            self.weight_ce * ce_loss
-            + self.weight_dice * dc_loss
-            + self.weight_hd * hd_loss
-        )
-        return result
+        region_weight = self.weight_ce + self.weight_dice
+        region_loss = (self.weight_ce / region_weight) * ce_loss + (
+            self.weight_dice / region_weight
+        ) * dc_loss
+        loss = self.alpha * region_loss + (1 - self.alpha) * hd_loss
+        # print(
+        #     f"Alpha: {self.alpha}. Region Loss: {region_loss}. HD Loss: {hd_loss}. Total Loss: {loss}"
+        # )
+        return loss

@@ -1,12 +1,17 @@
 import numpy as np
 import torch
 import sys
+from torch import autocast
+
 
 from nnunetv2.training.loss.dice import MemoryEfficientSoftDiceLoss
 from nnunetv2.training.loss.deep_supervision import DeepSupervisionWrapper
+from nnunetv2.utilities.helpers import dummy_context
+
 
 from mbas.training.nnUNetTrainer_MedNeXt import nnUNetTrainer_MedNeXt
 from mbas.training.compound_losses import DC_CE_HD_loss
+from mbas.utils.alpha_scheduler import alpha_stepwise
 
 
 class nnUNetTrainer_MedNeXt_CE_DC_HD(nnUNetTrainer_MedNeXt):
@@ -23,6 +28,7 @@ class nnUNetTrainer_MedNeXt_CE_DC_HD(nnUNetTrainer_MedNeXt):
         super().__init__(
             plans, configuration, fold, dataset_json, unpack_dataset, device
         )
+        self.alpha_stepsize = self.plans_manager.plans.get("alpha_stepsize", 5)
 
     def _build_loss(self):
         if self.label_manager.has_regions:
@@ -30,9 +36,8 @@ class nnUNetTrainer_MedNeXt_CE_DC_HD(nnUNetTrainer_MedNeXt):
                 "Region loss not implemented for nnUNetTrainer_MedNeXt_CE_DC_HD"
             )
 
-        lambda_hd = 1.0
+        lambda_ce = 1.0
         lambda_dice = 1.0
-        lambda_ce = lambda_dice + lambda_hd
 
         loss = DC_CE_HD_loss(
             soft_dice_kwargs={
@@ -44,12 +49,10 @@ class nnUNetTrainer_MedNeXt_CE_DC_HD(nnUNetTrainer_MedNeXt):
             ce_kwargs={},
             weight_ce=lambda_ce,
             weight_dice=lambda_dice,
-            weight_hd=lambda_hd,
             ignore_label=self.label_manager.ignore_label,
             dice_class=MemoryEfficientSoftDiceLoss,
         )
 
-        self.print_to_log_file(f"lambda_hausdorff: {lambda_hd}")
         self.print_to_log_file(f"lambda_dice: {lambda_dice}")
         self.print_to_log_file(f"lambda_ce: {lambda_ce}")
 
@@ -78,3 +81,47 @@ class nnUNetTrainer_MedNeXt_CE_DC_HD(nnUNetTrainer_MedNeXt):
             loss = DeepSupervisionWrapper(loss, weights)
 
         return loss
+
+    def train_step(self, batch: dict) -> dict:
+        data = batch["data"]
+        target = batch["target"]
+
+        alpha = alpha_stepwise(
+            self.current_epoch, self.num_epochs, h=self.alpha_stepsize
+        )
+        if self.enable_deep_supervision:
+            self.loss.loss.set_alpha(alpha)
+        else:
+            self.loss.set_alpha(alpha)
+
+        data = data.to(self.device, non_blocking=True)
+        if isinstance(target, list):
+            target = [i.to(self.device, non_blocking=True) for i in target]
+        else:
+            target = target.to(self.device, non_blocking=True)
+
+        self.optimizer.zero_grad(set_to_none=True)
+        # Autocast can be annoying
+        # If the device_type is 'cpu' then it's slow as heck and needs to be disabled.
+        # If the device_type is 'mps' then it will complain that mps is not implemented, even if enabled=False is set. Whyyyyyyy. (this is why we don't make use of enabled=False)
+        # So autocast will only be active if we have a cuda device.
+        with (
+            autocast(self.device.type, enabled=True)
+            if self.device.type == "cuda"
+            else dummy_context()
+        ):
+            output = self.network(data)
+            # del data
+            l = self.loss(output, target)
+
+        if self.grad_scaler is not None:
+            self.grad_scaler.scale(l).backward()
+            self.grad_scaler.unscale_(self.optimizer)
+            torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12)
+            self.grad_scaler.step(self.optimizer)
+            self.grad_scaler.update()
+        else:
+            l.backward()
+            torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12)
+            self.optimizer.step()
+        return {"loss": l.detach().cpu().numpy()}
