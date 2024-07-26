@@ -28,7 +28,13 @@ class nnUNetTrainer_MedNeXt_CE_DC_HD(nnUNetTrainer_MedNeXt):
         super().__init__(
             plans, configuration, fold, dataset_json, unpack_dataset, device
         )
-        self.alpha_stepsize = self.plans_manager.plans.get("alpha_stepsize", 5)
+        config = self.plans_manager.get_configuration(configuration)
+        self.boundary_loss_alpha_stepsize = config.configuration.get(
+            "boundary_loss_alpha_stepsize", 5
+        )
+        self.print_to_log_file(
+            f"boundary_loss_alpha_stepsize: {self.boundary_loss_alpha_stepsize}"
+        )
 
     def _build_loss(self):
         if self.label_manager.has_regions:
@@ -87,7 +93,7 @@ class nnUNetTrainer_MedNeXt_CE_DC_HD(nnUNetTrainer_MedNeXt):
         target = batch["target"]
 
         alpha = alpha_stepwise(
-            self.current_epoch, self.num_epochs, h=self.alpha_stepsize
+            self.current_epoch, self.num_epochs, h=self.boundary_loss_alpha_stepsize
         )
         if self.enable_deep_supervision:
             self.loss.loss.set_alpha(alpha)
