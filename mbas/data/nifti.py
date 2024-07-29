@@ -88,9 +88,7 @@ def get_subject_folders(dataset_folder: str) -> list[str]:
     return patient_folders
 
 
-def load_subjects(
-    dataset_folder: str, test_folder_prefix: str = "MGMT"
-) -> list[tio.Subject]:
+def load_subjects(dataset_folder: str) -> list[tio.Subject]:
 
     train_folders = get_subject_folders(os.path.join(dataset_folder, "Training"))
     val_folders = get_subject_folders(os.path.join(dataset_folder, "Validation"))

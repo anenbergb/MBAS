@@ -15,24 +15,24 @@ from monai.metrics import HausdorffDistanceMetric, DiceMetric
 from monai.transforms import AsDiscrete, Compose
 from mbas.data.nifti import make_subject, get_subject_folders
 from mbas.data.constants import MBAS_SHORT_LABELS
+from mbas.data.nifti import load_subjects
 
 
-def per_subject_metrics(train_dir, results_dir, save_filepath):
+def compute_per_subject_metrics(subjects: list[tio.Subject], results_dir: str):
     dice_metric = DiceMetric(
         include_background=False, reduction="mean", get_not_nans=False
     )
     hausdorff_metric = HausdorffDistanceMetric(
         include_background=False, percentile=95.0, directed=False
     )
-    to_onehot = Compose([AsDiscrete(to_onehot=4), lambda x: x[None]])
+    to_onehot = Compose(
+        [AsDiscrete(to_onehot=len(MBAS_SHORT_LABELS)), lambda x: x[None]]
+    )
 
     metrics_dict = []
-    subject_folders = get_subject_folders(train_dir)
-    for subject_folder in tqdm(subject_folders):
-        subject = make_subject(subject_folder)
+    for subject in tqdm(subjects):
         results_file = os.path.join(results_dir, f"{subject.patient_id_str}.nii.gz")
         if not os.path.exists(results_file):
-            logger.warning(f"{results_file} not found!")
             continue
         subject.add_image(tio.LabelMap(path=results_file), "predictions")
         label_onehot = to_onehot(subject.label.data)
@@ -52,11 +52,14 @@ def per_subject_metrics(train_dir, results_dir, save_filepath):
         for i, haus in enumerate(h123):
             mdict[f"HD95_{MBAS_SHORT_LABELS[i+1]}"] = haus
         metrics_dict.append(mdict)
-
     df = pd.DataFrame.from_records(metrics_dict)
-    os.makedirs(os.path.dirname(save_filepath), exist_ok=True)
-    df.to_pickle(save_filepath)
+    logger.info(
+        f"Computed per subject metrics for {len(df)} / {len(subjects)} subjects"
+    )
+    return df
 
+
+def make_average_table(df):
     metric_columns = [
         x for x in df.columns if x.startswith("DSC") or x.startswith("HD95")
     ]
@@ -66,6 +69,17 @@ def per_subject_metrics(train_dir, results_dir, save_filepath):
             "STD": df[metric_columns].std(),
         }
     )
+    return avg_df
+
+
+def per_subject_metrics(dataset_dir, results_dir, save_filepath):
+    subjects = load_subjects(dataset_dir)
+    logger.info(f"Loaded { len(subjects)} subjects")
+    df = compute_per_subject_metrics(subjects, results_dir)
+    os.makedirs(os.path.dirname(save_filepath), exist_ok=True)
+    df.to_pickle(save_filepath)
+    logger.info(f"Saved per subject metrics to {save_filepath}")
+    avg_df = make_average_table(df)
     print(tabulate(avg_df, headers="keys", tablefmt="github"))
 
 
@@ -77,8 +91,8 @@ Compute Dice score and Hausdorff distance per subject.
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--train-dir",
-        default="/home/bryan/data/MBAS/Training",
+        "--dataset-dir",
+        default="/home/bryan/data/MBAS",
         type=str,
     )
     parser.add_argument(
@@ -94,4 +108,4 @@ Compute Dice score and Hausdorff distance per subject.
 
 if __name__ == "__main__":
     args = get_args()
-    sys.exit(per_subject_metrics(args.train_dir, args.results_dir, args.save))
+    sys.exit(per_subject_metrics(args.dataset_dir, args.results_dir, args.save))
