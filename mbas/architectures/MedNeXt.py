@@ -466,29 +466,71 @@ class MedNeXtDecoder(nn.Module):
 
 if __name__ == "__main__":
 
-    strides = [
-        (2, 2, 2),
-        (1, 2, 2),
-        (1, 2, 2),
-        (2, 2, 2),
-        (2, 2, 2),
-        (1, 2, 2),
-        (1, 2, 2),
-    ]
+    patch_size = (16, 256, 256)
     network = MedNeXt(
         input_channels=1,
         n_stages=7,
         features_per_stage=[32, 64, 128, 256, 320, 320, 320],
-        stem_kernel_size=2,
-        kernel_sizes=[3, 3, 3, 3, 3, 3, 3],
-        strides=strides,
+        stem_kernel_size=1,
+        kernel_sizes=[
+            (1, 3, 3),
+            (1, 3, 3),
+            (3, 3, 3),
+            (3, 3, 3),
+            (3, 3, 3),
+            (3, 3, 3),
+            (3, 3, 3),
+        ],
+        strides=[
+            (1, 1, 1),
+            (1, 2, 2),
+            (1, 2, 2),
+            (2, 2, 2),
+            (2, 2, 2),
+            (2, 2, 2),
+            (2, 2, 2),
+        ],
         n_blocks_per_stage=[3, 4, 6, 6, 6, 6, 6],
         exp_ratio_per_stage=[2, 3, 4, 4, 4, 4, 4],
         n_blocks_per_stage_decoder=[6, 6, 6, 6, 4, 3, 3],
         exp_ratio_per_stage_decoder=[4, 4, 4, 4, 3, 2, 2],
         deep_supervision=True,
         decode_stem_kernel_size=3,
+        override_down_kernel_size=False,
+        down_kernel_size=1,
     ).cuda()
+
+    # patch_size = (16, 96, 96)
+    # network = MedNeXt(
+    #     input_channels=1,
+    #     n_stages=6,
+    #     features_per_stage=(32, 64, 128, 128, 128, 128),
+    #     stem_kernel_size=1,
+    #     kernel_sizes=[
+    #         (1, 3, 3),
+    #         (1, 3, 3),
+    #         (3, 3, 3),
+    #         (3, 3, 3),
+    #         (3, 3, 3),
+    #         (3, 3, 3),
+    #     ],
+    #     strides=[
+    #         (1, 1, 1),
+    #         (1, 2, 2),
+    #         (1, 2, 2),
+    #         (2, 2, 2),
+    #         (2, 2, 2),
+    #         (2, 2, 2),
+    #     ],
+    #     n_blocks_per_stage=[3, 4, 6, 6, 6, 6, 6],
+    #     exp_ratio_per_stage=[2, 3, 4, 4, 4, 4, 4],
+    #     n_blocks_per_stage_decoder=[6, 6, 6, 6, 4, 3, 3],
+    #     exp_ratio_per_stage_decoder=[4, 4, 4, 4, 3, 2, 2],
+    #     deep_supervision=True,
+    #     decode_stem_kernel_size=3,
+    #     override_down_kernel_size=False,
+    #     down_kernel_size=1,
+    # ).cuda()
 
     def count_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -496,20 +538,20 @@ if __name__ == "__main__":
     print(network)
     print(f"# parameters: {count_parameters(network)}")
 
-    num_bytes = network.compute_conv_feature_map_size((16, 256, 256))
+    num_bytes = network.compute_conv_feature_map_size(patch_size)
     print(f"Memory size: {num_bytes} bytes, {num_bytes / 1024**3:.2f} GB")
 
     from fvcore.nn import FlopCountAnalysis
     from fvcore.nn import parameter_count_table
 
     # B, C, D, H, W
-    x = torch.zeros((1, 1, 16, 256, 256), requires_grad=False).cuda()
+    x = torch.zeros((1, 1, *patch_size), requires_grad=False).cuda()
     with torch.no_grad():
         segs = network(x)
         for i, seg in enumerate(segs):
             print(f"Segmentation mask shape: {seg.shape}")
 
-    x = torch.zeros((1, 1, 16, 256, 256), requires_grad=False).cuda()
+    x = torch.zeros((1, 1, *patch_size), requires_grad=False).cuda()
     flops = FlopCountAnalysis(network, x)
     print(f"# FLOPs: {flops.total()}")
     print("Parameter count table:")

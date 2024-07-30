@@ -11,4 +11,10 @@ export nnUNet_raw="/home/bryan/data/nnUNet_raw"
 export nnUNet_preprocessed="/home/bryan/data/mbas_nnUNet_preprocessed"
 export nnUNet_results="/home/bryan/expr/mbas_nnUNet_results"
 
-nnUNetv2_train 101 slim_128_oversample_08 0 -tr nnUNetTrainer_MedNeXt -p MedNeXtPlans_2024_07_27 --c
+# nnUNetv2_train 101 slim_128_oversample_08 0 -tr nnUNetTrainer_MedNeXt -p MedNeXtPlans_2024_07_27 --c
+
+# nnUNetv2_find_best_configuration 101 -p MedNeXtPlans_2024_07_27 -c slim_128_oversample_08 -tr nnUNetTrainer_MedNeXt -f 0 --no_overwrite --disable_ensembling
+# nnUNetv2_find_best_configuration 101 -p MedNeXtPlans_2024_07_27 -c slim_128_oversample_05 -tr nnUNetTrainer_MedNeXt -f 0 --no_overwrite --disable_ensembling
+
+
+nnUNetv2_train 101 slim_128_oversample_08 0 -tr nnUNetTrainer_MedNeXt -p MedNeXtPlans_2024_07_27 --val

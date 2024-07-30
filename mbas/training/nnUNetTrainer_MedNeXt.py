@@ -34,12 +34,15 @@ class nnUNetTrainer_MedNeXt(nnUNetTrainer):
         self.probabilistic_oversampling = config.configuration.get(
             "probabilistic_oversampling", False
         )
-        sample_class_probabilities = config.configuration.get(
+        self.sample_class_probabilities = config.configuration.get(
             "sample_class_probabilities", None
         )
-        self.sample_class_probabilities = {}
-        for k, v in sample_class_probabilities.items():
-            self.sample_class_probabilities[int(k)] = v
+        if self.sample_class_probabilities is not None:
+            assert isinstance(self.sample_class_probabilities, dict)
+            sample_class_probabilities = {}
+            for k, v in self.sample_class_probabilities.items():
+                sample_class_probabilities[int(k)] = v
+            self.sample_class_probabilities = sample_class_probabilities
 
     def _get_deep_supervision_scales(self):
         if self.enable_deep_supervision:
