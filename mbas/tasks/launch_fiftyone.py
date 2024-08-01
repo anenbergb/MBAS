@@ -103,9 +103,9 @@ def add_segmentation_to_sample(
         sample.frames[i][segmentation_key] = segmentation
 
 
-def launch_fiftyone_app(dataset, color_scheme):
+def launch_fiftyone_app(dataset, color_scheme, port=5151):
     # Launch the FiftyOne app
-    session = fo.launch_app(dataset, color_scheme=color_scheme)
+    session = fo.launch_app(dataset, color_scheme=color_scheme, port=port)
     session.wait()
 
 
@@ -150,6 +150,7 @@ def launch_fiftyone(
     dataset_name,
     predictions_dir=[],
     predictions_name=None,
+    port=5151,
 ):
     train_folders = sorted(get_subject_folders(os.path.join(data_dir, "Training")))
     val_folders = sorted(get_subject_folders(os.path.join(data_dir, "Validation")))
@@ -163,7 +164,7 @@ def launch_fiftyone(
     dataset.default_mask_targets = MBAS_LABELS
     dataset.add_samples(samples)
     color_scheme = make_color_scheme(predictions_name)
-    launch_fiftyone_app(dataset, color_scheme)
+    launch_fiftyone_app(dataset, color_scheme, port=port)
 
 
 def get_args() -> argparse.Namespace:
@@ -195,6 +196,11 @@ Render video for each subject
         type=str,
         default="predictions",
     )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=5151,
+    )
     return parser.parse_args()
 
 
@@ -206,5 +212,6 @@ if __name__ == "__main__":
             args.dataset_name,
             args.predictions_dir,
             args.predictions_name,
+            args.port,
         )
     )

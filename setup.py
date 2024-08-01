@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="mgmt",
+    name="mbas",
     version="1.0.0",
     url="https://github.com/anenbergb/MBAS",
     author="Bryan Anenberg",
@@ -35,6 +35,9 @@ setup(
         "loguru",
         "ray[tune]",
         "scikit-learn"
+        "tabulate",
+        "cucim-cu12",
+        "cupy",
     ],
     extras_require={
         "torch": [

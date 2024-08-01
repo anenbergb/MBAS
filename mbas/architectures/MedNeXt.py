@@ -35,6 +35,8 @@ class MedNeXt(nn.Module):
         norm_type: str = "group",
         enable_affine_transform: bool = False,
         decode_stem_kernel_size: Union[int, List[int], Tuple[int, ...]] = 1,
+        override_down_kernel_size: bool = False,
+        down_kernel_size: Union[int, List[int], Tuple[int, ...]] = 1,
     ):
         """
 
@@ -65,6 +67,8 @@ class MedNeXt(nn.Module):
             return_skips=True,
             norm_type=norm_type,
             enable_affine_transform=enable_affine_transform,
+            override_down_kernel_size=override_down_kernel_size,
+            down_kernel_size=down_kernel_size,
         )
         self.decoder = MedNeXtDecoder(
             encoder=self.encoder,
@@ -113,6 +117,8 @@ class MedNeXtEncoder(nn.Module):
         return_skips: bool = False,
         norm_type: str = "group",
         enable_affine_transform: bool = False,
+        override_down_kernel_size: bool = False,
+        down_kernel_size: Union[int, List[int], Tuple[int, ...]] = 1,
     ):
         """
         The first stage is the stem
@@ -163,12 +169,15 @@ class MedNeXtEncoder(nn.Module):
                     norm_type=norm_type,
                 )
             else:
+                down_kernel = (
+                    down_kernel_size if override_down_kernel_size else kernel_sizes[i]
+                )
                 down_block = MedNeXtBlock(
                     in_channels=input_channels,
                     out_channels=features_per_stage[i],
                     conv_op=conv_op,
                     exp_ratio=exp_ratio_per_stage[i],
-                    kernel_size=kernel_sizes[i],
+                    kernel_size=down_kernel,
                     stride=strides[i],
                     norm_type=norm_type,
                     enable_affine_transform=enable_affine_transform,
@@ -202,6 +211,8 @@ class MedNeXtEncoder(nn.Module):
         self.kernel_sizes = kernel_sizes
         self.norm_type = norm_type
         self.enable_affine_transform = enable_affine_transform
+        self.override_down_kernel_size = override_down_kernel_size
+        self.down_kernel_size = down_kernel_size
 
     def forward(self, x):
         features = []
@@ -455,29 +466,71 @@ class MedNeXtDecoder(nn.Module):
 
 if __name__ == "__main__":
 
-    strides = [
-        (2, 2, 2),
-        (1, 2, 2),
-        (1, 2, 2),
-        (2, 2, 2),
-        (2, 2, 2),
-        (1, 2, 2),
-        (1, 2, 2),
-    ]
+    patch_size = (16, 256, 256)
     network = MedNeXt(
         input_channels=1,
         n_stages=7,
         features_per_stage=[32, 64, 128, 256, 320, 320, 320],
-        stem_kernel_size=2,
-        kernel_sizes=[3, 3, 3, 3, 3, 3, 3],
-        strides=strides,
+        stem_kernel_size=1,
+        kernel_sizes=[
+            (1, 3, 3),
+            (1, 3, 3),
+            (3, 3, 3),
+            (3, 3, 3),
+            (3, 3, 3),
+            (3, 3, 3),
+            (3, 3, 3),
+        ],
+        strides=[
+            (1, 1, 1),
+            (1, 2, 2),
+            (1, 2, 2),
+            (2, 2, 2),
+            (2, 2, 2),
+            (2, 2, 2),
+            (2, 2, 2),
+        ],
         n_blocks_per_stage=[3, 4, 6, 6, 6, 6, 6],
         exp_ratio_per_stage=[2, 3, 4, 4, 4, 4, 4],
         n_blocks_per_stage_decoder=[6, 6, 6, 6, 4, 3, 3],
         exp_ratio_per_stage_decoder=[4, 4, 4, 4, 3, 2, 2],
         deep_supervision=True,
         decode_stem_kernel_size=3,
+        override_down_kernel_size=False,
+        down_kernel_size=1,
     ).cuda()
+
+    # patch_size = (16, 96, 96)
+    # network = MedNeXt(
+    #     input_channels=1,
+    #     n_stages=6,
+    #     features_per_stage=(32, 64, 128, 128, 128, 128),
+    #     stem_kernel_size=1,
+    #     kernel_sizes=[
+    #         (1, 3, 3),
+    #         (1, 3, 3),
+    #         (3, 3, 3),
+    #         (3, 3, 3),
+    #         (3, 3, 3),
+    #         (3, 3, 3),
+    #     ],
+    #     strides=[
+    #         (1, 1, 1),
+    #         (1, 2, 2),
+    #         (1, 2, 2),
+    #         (2, 2, 2),
+    #         (2, 2, 2),
+    #         (2, 2, 2),
+    #     ],
+    #     n_blocks_per_stage=[3, 4, 6, 6, 6, 6, 6],
+    #     exp_ratio_per_stage=[2, 3, 4, 4, 4, 4, 4],
+    #     n_blocks_per_stage_decoder=[6, 6, 6, 6, 4, 3, 3],
+    #     exp_ratio_per_stage_decoder=[4, 4, 4, 4, 3, 2, 2],
+    #     deep_supervision=True,
+    #     decode_stem_kernel_size=3,
+    #     override_down_kernel_size=False,
+    #     down_kernel_size=1,
+    # ).cuda()
 
     def count_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -485,20 +538,20 @@ if __name__ == "__main__":
     print(network)
     print(f"# parameters: {count_parameters(network)}")
 
-    num_bytes = network.compute_conv_feature_map_size((16, 256, 256))
+    num_bytes = network.compute_conv_feature_map_size(patch_size)
     print(f"Memory size: {num_bytes} bytes, {num_bytes / 1024**3:.2f} GB")
 
     from fvcore.nn import FlopCountAnalysis
     from fvcore.nn import parameter_count_table
 
     # B, C, D, H, W
-    x = torch.zeros((1, 1, 16, 256, 256), requires_grad=False).cuda()
+    x = torch.zeros((1, 1, *patch_size), requires_grad=False).cuda()
     with torch.no_grad():
         segs = network(x)
         for i, seg in enumerate(segs):
             print(f"Segmentation mask shape: {seg.shape}")
 
-    x = torch.zeros((1, 1, 16, 256, 256), requires_grad=False).cuda()
+    x = torch.zeros((1, 1, *patch_size), requires_grad=False).cuda()
     flops = FlopCountAnalysis(network, x)
     print(f"# FLOPs: {flops.total()}")
     print("Parameter count table:")
