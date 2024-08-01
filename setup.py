@@ -34,10 +34,8 @@ setup(
         "seaborn",
         "loguru",
         "ray[tune]",
-        "scikit-learn"
+        "scikit-learn",
         "tabulate",
-        "cucim-cu12",
-        "cupy",
     ],
     extras_require={
         "torch": [
@@ -50,6 +48,11 @@ setup(
             "jupyter_contrib_nbextensions",
             "plotly",
             "seaborn",
+            "fiftyone",
+        ],
+        "gpu": [
+            "cucim-cu12",
+            "cupy",
         ],
         "dev": ["black", "mypy", "flake8", "isort", "ipdb"],
     },
