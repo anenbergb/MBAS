@@ -23,6 +23,7 @@ class MedNeXtV2(nn.Module):
         conv_op: Type[_ConvNd] = nn.Conv3d,
         stem_kernel_size: Union[int, List[int], Tuple[int, ...]] = [1, 3, 3],
         stem_channels: int | None = None,
+        stem_dilation: Union[int, List[int], Tuple[int, ...]] = 1,
         kernel_sizes: Union[
             int, List[int], Tuple[int, ...], Tuple[Tuple[int, ...], ...]
         ] = [
@@ -43,6 +44,7 @@ class MedNeXtV2(nn.Module):
             [1, 2, 2],
             [1, 2, 2],
         ],
+        dilation_per_stage: Union[int, List[int], Tuple[int, ...]] = 1,
         n_blocks_per_stage: List[int] = [1, 3, 4, 6, 6, 6, 6],
         exp_ratio_per_stage: List[int] = [2, 3, 4, 4, 4, 4, 4],
         num_classes: int = 3,
@@ -76,6 +78,7 @@ class MedNeXtV2(nn.Module):
             conv_op=conv_op,
             kernel_sizes=kernel_sizes,
             strides=strides,
+            dilation_per_stage=dilation_per_stage,
             n_blocks_per_stage=n_blocks_per_stage,
             exp_ratio_per_stage=exp_ratio_per_stage,
             return_skips=True,
@@ -83,6 +86,7 @@ class MedNeXtV2(nn.Module):
             enable_affine_transform=enable_affine_transform,
             stem_kernel_size=stem_kernel_size,
             stem_channels=stem_channels,
+            stem_dilation=stem_dilation,
         )
         self.decoder = MedNeXtDecoder(
             encoder=self.encoder,
@@ -125,6 +129,7 @@ class MedNeXtEncoder(nn.Module):
             int, List[int], Tuple[int, ...], Tuple[Tuple[int, ...], ...]
         ],
         strides: Union[int, List[int], Tuple[int, ...], Tuple[Tuple[int, ...], ...]],
+        dilation_per_stage: Union[int, List[int], Tuple[int, ...]],
         n_blocks_per_stage: List[int],
         exp_ratio_per_stage: List[int],
         return_skips: bool = False,
@@ -132,6 +137,7 @@ class MedNeXtEncoder(nn.Module):
         enable_affine_transform: bool = False,
         stem_kernel_size: Union[int, List[int], Tuple[int, ...]] = 1,
         stem_channels: int | None = None,
+        stem_dilation: Union[int, List[int], Tuple[int, ...]] = 1,
     ):
         """
         The first stage is the stem
@@ -151,6 +157,8 @@ class MedNeXtEncoder(nn.Module):
             kernel_sizes = [kernel_sizes] * n_stages
         if isinstance(strides, int):
             strides = [strides] * n_stages
+        if isinstance(dilation_per_stage, int):
+            dilation_per_stage = [dilation_per_stage] * n_stages
 
         assert (
             len(kernel_sizes) == n_stages
@@ -167,6 +175,9 @@ class MedNeXtEncoder(nn.Module):
         assert (
             len(strides) == n_stages
         ), "strides must have as many entries as we have resolution stages (n_stages)"
+        assert (
+            len(dilation_per_stage) == n_stages
+        ), "dilations_per_stage must have as many entries as we have resolution stages (n_stages)"
 
         self.stem = Stem(
             in_channels=input_channels,
@@ -177,6 +188,7 @@ class MedNeXtEncoder(nn.Module):
             kernel_size=stem_kernel_size,
             stride=1,
             padding=None,
+            dilation=stem_dilation,
             norm_type=norm_type,
         )
         input_channels = (
@@ -197,6 +209,7 @@ class MedNeXtEncoder(nn.Module):
                         exp_ratio=exp_ratio_per_stage[i],
                         kernel_size=kernel_sizes[i],
                         stride=strides[i] if bi == 0 else 1,
+                        dilation=dilation_per_stage[i],
                         norm_type=norm_type,
                         enable_affine_transform=enable_affine_transform,
                     )
@@ -392,6 +405,7 @@ if __name__ == "__main__":
         features_per_stage=[32, 64, 128, 256, 320, 320, 320],
         stem_kernel_size=[1, 3, 3],
         stem_channels=None,
+        stem_dilation=2,
         kernel_sizes=[
             [1, 3, 3],
             [1, 3, 3],

@@ -12,6 +12,16 @@ from dynamic_network_architectures.building_blocks.helper import (
 )
 
 
+def padding_from_kernel_dilation(
+    kernel_size: Union[List[int], Tuple[int, ...]],
+    dilation: Union[List[int], Tuple[int, ...]],
+) -> List[int]:
+    assert len(kernel_size) == len(
+        dilation
+    ), "Kernel size and dilation must have the same length!"
+    return [d * (k - 1) // 2 for k, d in zip(kernel_size, dilation)]
+
+
 class Stem(nn.Module):
     def __init__(
         self,
@@ -21,6 +31,7 @@ class Stem(nn.Module):
         kernel_size: Union[int, List[int], Tuple[int, ...]] = 3,
         stride: Union[int, List[int], Tuple[int, ...]] = 1,
         padding: int | None = 0,
+        dilation: Union[int, List[int], Tuple[int, ...]] = 1,
         norm_type: str = "group",
         n_groups: int | None = None,
     ):
@@ -32,17 +43,22 @@ class Stem(nn.Module):
 
         kernel_size = tuple(maybe_convert_scalar_to_list(conv_op, kernel_size))
         stride = tuple(maybe_convert_scalar_to_list(conv_op, stride))
+        dilation = tuple(maybe_convert_scalar_to_list(conv_op, dilation))
         if padding == 0:
             assert (
                 kernel_size == stride
             ), f"Kernel size {kernel_size} and stride {stride} must be equal in the Stem!"
+
+        if padding is None:
+            padding = padding_from_kernel_dilation(kernel_size, dilation)
 
         self.conv1 = conv_op(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,
             stride=stride,
-            padding=[(i - 1) // 2 for i in kernel_size] if padding is None else padding,
+            padding=padding,
+            dilation=dilation,
         )
         self.n_groups = out_channels if n_groups is None else n_groups
         if norm_type == "group":
@@ -80,6 +96,7 @@ class MedNeXtBlock(nn.Module):
         exp_ratio: int = 4,
         kernel_size: Union[int, List[int], Tuple[int, ...]] = 5,
         stride: Union[int, List[int], Tuple[int, ...]] = 1,
+        dilation: Union[int, List[int], Tuple[int, ...]] = 1,
         norm_type: str = "group",
         n_groups: int | None = None,
         enable_affine_transform: bool = False,
@@ -93,6 +110,7 @@ class MedNeXtBlock(nn.Module):
         """
         self.stride = maybe_convert_scalar_to_list(conv_op, stride)
         kernel_size = maybe_convert_scalar_to_list(conv_op, kernel_size)
+        dilation = maybe_convert_scalar_to_list(conv_op, dilation)
         self.n_groups = in_channels if n_groups is None else n_groups
 
         conv1_op = get_matching_convtransp(conv_op) if upsample else conv_op
@@ -102,8 +120,8 @@ class MedNeXtBlock(nn.Module):
             out_channels=in_channels,
             kernel_size=kernel_size,
             stride=self.stride,
-            padding=[(i - 1) // 2 for i in kernel_size],
-            dilation=1,
+            padding=padding_from_kernel_dilation(kernel_size, dilation),
+            dilation=dilation,
             groups=self.n_groups,
         )
 
