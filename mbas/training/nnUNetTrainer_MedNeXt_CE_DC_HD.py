@@ -11,7 +11,10 @@ from nnunetv2.utilities.helpers import dummy_context
 
 from mbas.training.nnUNetTrainer_MedNeXt import nnUNetTrainer_MedNeXt
 from mbas.training.compound_losses import DC_CE_HD_loss
-from mbas.utils.alpha_scheduler import alpha_stepwise
+from mbas.utils.alpha_scheduler import (
+    alpha_stepwise_warmup,
+    alpha_stepwise_warmup_scaled,
+)
 
 
 class nnUNetTrainer_MedNeXt_CE_DC_HD(nnUNetTrainer_MedNeXt):
@@ -32,9 +35,23 @@ class nnUNetTrainer_MedNeXt_CE_DC_HD(nnUNetTrainer_MedNeXt):
         self.boundary_loss_alpha_stepsize = config.configuration.get(
             "boundary_loss_alpha_stepsize", 5
         )
-        self.print_to_log_file(
-            f"boundary_loss_alpha_stepsize: {self.boundary_loss_alpha_stepsize}"
+        self.boundary_loss_alpha_warmup_epochs = config.configuration.get(
+            "boundary_loss_alpha_warmup_epochs", 250
         )
+        self.boundary_loss_alpha_max = config.configuration.get(
+            "boundary_loss_alpha_max", 0.75
+        )
+        self.alpha_stepwise_warmup_scaled = config.configuration.get(
+            "alpha_stepwise_warmup_scaled", True
+        )
+
+        for key in (
+            "boundary_loss_alpha_stepsize",
+            "boundary_loss_alpha_warmup_epochs",
+            "boundary_loss_alpha_max",
+            "alpha_stepwise_warmup_scaled",
+        ):
+            self.print_to_log_file(f"{key}: {getattr(self, key)}")
 
     def _build_loss(self):
         if self.label_manager.has_regions:
@@ -92,9 +109,22 @@ class nnUNetTrainer_MedNeXt_CE_DC_HD(nnUNetTrainer_MedNeXt):
         data = batch["data"]
         target = batch["target"]
 
-        alpha = alpha_stepwise(
-            self.current_epoch, self.num_epochs, h=self.boundary_loss_alpha_stepsize
-        )
+        if self.alpha_stepwise_warmup_scaled:
+            alpha = alpha_stepwise_warmup_scaled(
+                self.current_epoch,
+                self.num_epochs,
+                h=self.boundary_loss_alpha_stepsize,
+                warmup_epochs=self.boundary_loss_alpha_warmup_epochs,
+                max_alpha=self.boundary_loss_alpha_max,
+            )
+        else:
+            alpha = alpha_stepwise_warmup(
+                self.current_epoch,
+                self.num_epochs,
+                h=self.boundary_loss_alpha_stepsize,
+                warmup_epochs=self.boundary_loss_alpha_warmup_epochs,
+                max_alpha=self.boundary_loss_alpha_max,
+            )
         if self.enable_deep_supervision:
             self.loss.loss.set_alpha(alpha)
         else:

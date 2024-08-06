@@ -20,7 +20,7 @@ class Stem(nn.Module):
         conv_op: Type[_ConvNd] = nn.Conv3d,
         kernel_size: Union[int, List[int], Tuple[int, ...]] = 3,
         stride: Union[int, List[int], Tuple[int, ...]] = 1,
-        padding: int = 0,
+        padding: int | None = 0,
         norm_type: str = "group",
         n_groups: int | None = None,
     ):
@@ -32,16 +32,17 @@ class Stem(nn.Module):
 
         kernel_size = tuple(maybe_convert_scalar_to_list(conv_op, kernel_size))
         stride = tuple(maybe_convert_scalar_to_list(conv_op, stride))
-        assert (
-            kernel_size == stride
-        ), f"Kernel size {kernel_size} and stride {stride} must be equal in the Stem!"
+        if padding == 0:
+            assert (
+                kernel_size == stride
+            ), f"Kernel size {kernel_size} and stride {stride} must be equal in the Stem!"
 
         self.conv1 = conv_op(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,
             stride=stride,
-            padding=padding,
+            padding=[(i - 1) // 2 for i in kernel_size] if padding is None else padding,
         )
         self.n_groups = out_channels if n_groups is None else n_groups
         if norm_type == "group":

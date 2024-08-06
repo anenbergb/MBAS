@@ -94,7 +94,7 @@ class DC_CE_HD_loss(nn.Module):
         region_loss = (self.weight_ce / region_weight) * ce_loss + (
             self.weight_dice / region_weight
         ) * dc_loss
-        loss = self.alpha * region_loss + (1 - self.alpha) * hd_loss
+        loss = (1.0 - self.alpha) * region_loss + self.alpha * hd_loss
         # print(
         #     f"Alpha: {self.alpha}. Region Loss: {region_loss}. HD Loss: {hd_loss}. Total Loss: {loss}"
         # )
