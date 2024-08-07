@@ -8,8 +8,8 @@ conda activate $CONDA
 export nnUNet_keep_files_open=1
 export nnUNet_n_proc_DA=4
 export nnUNet_raw="/home/bryan/data/nnUNet_raw"
-export nnUNet_preprocessed="/home/bryan/data/mbas_nnUNet_preprocessed"
-export nnUNet_results="/home/bryan/expr/mbas_nnUNet_results"
+export nnUNet_preprocessed="/home/ubuntu/storage/mbas_nnUNet_preprocessed"
+export nnUNet_results="/home/ubuntu/storage/mbas_nnUNet_results"
 
 MODEL=M_bs4
 PLANS=MedNeXtV2Plans_2024_08_06
