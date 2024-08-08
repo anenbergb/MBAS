@@ -27,6 +27,8 @@ class nnUNetTrainer_MedNeXt(nnUNetTrainer):
         super().__init__(
             plans, configuration, fold, dataset_json, unpack_dataset, device
         )
+        self.save_every = 10
+
         config = self.configuration_manager.configuration
         self.oversample_foreground_percent = config.get(
             "oversample_foreground_percent", 0.33
