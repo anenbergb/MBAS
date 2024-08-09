@@ -99,3 +99,77 @@ class DC_CE_HD_loss(nn.Module):
         #     f"Alpha: {self.alpha}. Region Loss: {region_loss}. HD Loss: {hd_loss}. Total Loss: {loss}"
         # )
         return loss
+
+
+class DC_and_CE_loss_cascaded_mask(nn.Module):
+    def __init__(
+        self,
+        soft_dice_kwargs,
+        ce_kwargs,
+        weight_ce=1,
+        weight_dice=1,
+        ignore_label=None,
+        dice_class=SoftDiceLoss,
+    ):
+        """
+        Weights for CE and Dice do not need to sum to one. You can set whatever you want.
+        :param soft_dice_kwargs:
+        :param ce_kwargs:
+        :param aggregate:
+        :param square_dice:
+        :param weight_ce:
+        :param weight_dice:
+        """
+        super(DC_and_CE_loss_cascaded_mask, self).__init__()
+        if ignore_label is not None:
+            ce_kwargs["ignore_index"] = ignore_label
+
+        ce_kwargs["reduction"] = "none"
+
+        self.weight_dice = weight_dice
+        self.weight_ce = weight_ce
+        self.ignore_label = ignore_label
+        self.ce = RobustCrossEntropyLoss(**ce_kwargs)
+        self.dc = dice_class(apply_nonlin=softmax_helper_dim1, **soft_dice_kwargs)
+
+    def forward(self, net_output: torch.Tensor, target: torch.Tensor):
+        """
+        target must be b, c, x, y(, z) with c=1
+        :param net_output:
+        :param target:
+        :return:
+        """
+        # Example target shape (N,2,16,128,128)
+        mask = target[:, 1:2]  # (N,1,16,128,128), assume that the mask is binary
+        target = target[:, 0:1]  # (N,1,16,128,128)
+        # anything outside the mask should be ignored
+        target_dice = mask * target
+
+        num_fg = mask.sum()
+
+        # IGNORE LABEL ISN'T SUPPORTED YET
+        # if self.ignore_label is not None:
+        #     assert target.shape[1] == 1, 'ignore label is not implemented for one hot encoded target variables ' \
+        #                                  '(DC_and_CE_loss)'
+        #     mask = target != self.ignore_label
+        #     # remove ignore label from target, replace with one of the known labels. It doesn't matter because we
+        #     # ignore gradients in those areas anyway
+        #     # Set ignore_label locations to 0 (background)
+        #     target_dice = torch.where(mask, target, 0)
+        #     num_fg = mask.sum()
+        # else:
+        #     target_dice = target
+        #     mask = None
+
+        dc_loss = (
+            self.dc(net_output, target_dice, loss_mask=mask)
+            if self.weight_dice != 0
+            else 0
+        )
+        ce_loss = 0
+        if self.weight_ce != 0 and (self.ignore_label is None or num_fg > 0):
+            ce_loss_tensor = self.ce(net_output, target[:, 0])
+            ce_loss = (ce_loss_tensor * mask).sum() / mask.sum()
+
+        result = self.weight_ce * ce_loss + self.weight_dice * dc_loss
+        return result

@@ -11,14 +11,27 @@ conda activate $CONDA
 # -p /Users/bryan/expr/mbas_nnUNet_results/Dataset101_MBAS/nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05/crossval_results_folds_0 \
 # --port 5151
 
-python mbas/tasks/launch_fiftyone.py \
---data-dir /home/bryan/data/MBAS \
---dataset-name mbas_videos \
--p /home/bryan/expr/mbas_nnUNet_results/Dataset101_MBAS/nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05/crossval_results_folds_0/postprocessed \
---port 5151
+# python mbas/tasks/launch_fiftyone.py \
+# --data-dir /home/bryan/data/MBAS \
+# --dataset-name mbas_videos \
+# -p /home/bryan/expr/mbas_nnUNet_results/Dataset101_MBAS/nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05/crossval_results_folds_0/postprocessed \
+# --port 5151
+
+# python mbas/tasks/launch_fiftyone.py \
+# --data-dir /home/bryan/data/MBAS \
+# --dataset-name mbas_videos \
+# -p /home/bryan/expr/mbas_nnUNet_results/Dataset101_MBAS/nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05/crossval_results_folds_0 \
+# --port 5151
+
+
+# python mbas/tasks/launch_fiftyone.py \
+# --data-dir /home/bryan/data/MBAS \
+# --dataset-name mbas_videos \
+# -p /home/bryan/expr/mbas_nnUNet_results/Dataset101_MBAS/nnUNetTrainer_MedNeXt__MedNeXtV2Plans_2024_08_06__M_baseline/crossval_results_folds_0/postprocessed \
+# --port 5151
 
 python mbas/tasks/launch_fiftyone.py \
 --data-dir /home/bryan/data/MBAS \
 --dataset-name mbas_videos \
--p /home/bryan/expr/mbas_nnUNet_results/Dataset101_MBAS/nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05/crossval_results_folds_0 \
+-p /home/bryan/expr/mbas_nnUNet_results/Dataset101_MBAS/nnUNetTrainer_MedNeXt__MedNeXtV2Plans_2024_08_06__M_baseline/crossval_results_folds_0 \
 --port 5151
