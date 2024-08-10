@@ -11,14 +11,20 @@ export nnUNet_raw="/home/bryan/data/nnUNet_raw"
 export nnUNet_preprocessed="/home/ubuntu/storage/mbas_nnUNet_preprocessed"
 export nnUNet_results="/home/ubuntu/storage/mbas_nnUNet_results"
 
-MODEL=M_stem_dil2
-PLANS=MedNeXtV2Plans_2024_08_06
-TRAINER=nnUNetTrainer_MedNeXt
-nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
-nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --no_overwrite --disable_ensembling
+# MODEL=M_stem_dil2
+# PLANS=MedNeXtV2Plans_2024_08_06
+# TRAINER=nnUNetTrainer_MedNeXt
+# nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
+# nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --no_overwrite --disable_ensembling
 
-MODEL=M_stem_dil1_dil2
+# MODEL=M_stem_dil1_dil2
+# PLANS=MedNeXtV2Plans_2024_08_06
+# TRAINER=nnUNetTrainer_MedNeXt
+# nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
+# nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --no_overwrite --disable_ensembling
+
+MODEL=M_baseline_batch_dice
 PLANS=MedNeXtV2Plans_2024_08_06
 TRAINER=nnUNetTrainer_MedNeXt
-nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
+nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS --c
 nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --no_overwrite --disable_ensembling

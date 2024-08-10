@@ -1,7 +1,7 @@
 #!/bin/bash
 
 eval "$(conda shell.bash hook)"
-export CUDA_VISIBLE_DEVICES=2
+export CUDA_VISIBLE_DEVICES=1
 CONDA=mbas
 conda activate $CONDA
 
@@ -14,5 +14,5 @@ export nnUNet_results="/home/ubuntu/storage/mbas_nnUNet_results"
 MODEL=M_bs4
 PLANS=MedNeXtV2Plans_2024_08_06
 TRAINER=nnUNetTrainer_MedNeXt
-nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
+nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS --c
 nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --no_overwrite --disable_ensembling

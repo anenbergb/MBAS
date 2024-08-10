@@ -14,5 +14,5 @@ export nnUNet_results="/home/ubuntu/storage/mbas_nnUNet_results"
 MODEL=3d_fullres
 PLANS=nnUNetResEncUNetXLPlans
 TRAINER=nnUNetTrainer
-nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
+nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS --c
 nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --no_overwrite --disable_ensembling
