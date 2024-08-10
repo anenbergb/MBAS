@@ -110,6 +110,10 @@ from batchgeneratorsv2.transforms.utils.seg_to_regions import (
 
 from mbas.training.compound_losses import DC_and_CE_loss_cascaded_mask
 from mbas.training.label_handling import determine_num_input_channels
+from mbas.utils.binary_dilation_transform import (
+    ApplyBinaryDilationTransform,
+    binary_dilation_transform,
+)
 
 
 class nnUNetTrainer_MedNeXt(nnUNetTrainer):
@@ -145,6 +149,7 @@ class nnUNetTrainer_MedNeXt(nnUNetTrainer):
 
         # Treat the 1st stage segmentation output as a mask applied to the loss of the 2nd stage
         self.is_cascaded_mask = config.get("is_cascaded_mask", False)
+        self.cascaded_mask_dilation = config.get("cascaded_mask_dilation", 0)
 
     def initialize(self):
         if not self.was_initialized:
@@ -236,6 +241,7 @@ class nnUNetTrainer_MedNeXt(nnUNetTrainer):
             ),
             ignore_label=self.label_manager.ignore_label,
             is_cascaded_mask=self.is_cascaded_mask,
+            cascaded_mask_dilation=self.cascaded_mask_dilation,
         )
 
         # validation pipeline
@@ -250,6 +256,7 @@ class nnUNetTrainer_MedNeXt(nnUNetTrainer):
             ),
             ignore_label=self.label_manager.ignore_label,
             is_cascaded_mask=self.is_cascaded_mask,
+            cascaded_mask_dilation=self.cascaded_mask_dilation,
         )
 
         dataset_tr, dataset_val = self.get_tr_and_val_datasets()
@@ -346,6 +353,7 @@ class nnUNetTrainer_MedNeXt(nnUNetTrainer):
         regions: List[Union[List[int], Tuple[int, ...], int]] = None,
         ignore_label: int = None,
         is_cascaded_mask: bool = False,
+        cascaded_mask_dilation: int = 0,
     ) -> BasicTransform:
         transforms = []
         if do_dummy_2d_data_aug:
@@ -503,6 +511,12 @@ class nnUNetTrainer_MedNeXt(nnUNetTrainer):
                     apply_probability=0.2,
                 )
             )
+        if is_cascaded and is_cascaded_mask and cascaded_mask_dilation > 0:
+            transforms.append(
+                ApplyBinaryDilationTransform(
+                    channel_index=1, radius=cascaded_mask_dilation
+                )
+            )
 
         if regions is not None:
             if is_cascaded_mask:
@@ -534,6 +548,7 @@ class nnUNetTrainer_MedNeXt(nnUNetTrainer):
         regions: List[Union[List[int], Tuple[int, ...], int]] = None,
         ignore_label: int = None,
         is_cascaded_mask: bool = False,
+        cascaded_mask_dilation: int = 0,
     ) -> BasicTransform:
         transforms = []
         transforms.append(RemoveLabelTansform(-1, 0))
@@ -544,6 +559,13 @@ class nnUNetTrainer_MedNeXt(nnUNetTrainer):
                     source_channel_idx=1,
                     all_labels=foreground_labels,
                     remove_channel_from_source=True,
+                )
+            )
+
+        if is_cascaded and is_cascaded_mask and cascaded_mask_dilation > 0:
+            transforms.append(
+                ApplyBinaryDilationTransform(
+                    channel_index=1, radius=cascaded_mask_dilation
                 )
             )
 
@@ -846,7 +868,13 @@ class nnUNetTrainer_MedNeXt(nnUNetTrainer):
 
                 if self.is_cascaded and self.is_cascaded_mask:
                     # prediction.shape (4,44,574,574)
+                    # mask shape (1,44,574,574)
                     mask = torch.from_numpy(seg[1:2]).to(torch.bool)
+                    if self.cascaded_mask_dilation > 0:
+                        mask[0] = binary_dilation_transform(
+                            mask[0], self.cascaded_mask_dilation
+                        )
+
                     # background class-0 prediction is the first channel
                     # set the un-masked region (background) to 1
                     # leave the masked region (foreground) as is
