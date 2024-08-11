@@ -116,7 +116,7 @@ from mbas.utils.binary_dilation_transform import (
 )
 
 
-class nnUNetTrainer_MedNeXt(nnUNetTrainer):
+class mbasTrainer(nnUNetTrainer):
     def __init__(
         self,
         plans: dict,
@@ -198,9 +198,16 @@ class nnUNetTrainer_MedNeXt(nnUNetTrainer):
                 stride0_set = set(strides[0])
                 if len(stride0_set) > 1 or stride0_set.pop() != 1:
                     strides = [[1, 1, 1]] + strides
-            elif network_name.endswith("MedNeXtV2"):
+            elif network_name.endswith("MedNeXtV2") or network_name.endswith(
+                "ResidualEncoderUNet"
+            ):
                 # MedNeXtV2 does not include deep supervision on the last layer
                 strides = strides[:-1]
+            else:
+                self.print_to_log_file(
+                    "WARNING! You are using deep supervision but the network architecture is not recognized. "
+                    "This may lead to unexpected behavior."
+                )
             deep_supervision_scales = list(
                 list(i) for i in 1 / np.cumprod(np.vstack(strides), axis=0)
             )

@@ -6,7 +6,7 @@ CONDA=mbas
 conda activate $CONDA
 
 export nnUNet_keep_files_open=1
-export nnUNet_n_proc_DA=1
+export nnUNet_n_proc_DA=4
 export nnUNet_raw="/home/bryan/data/nnUNet_raw"
 export nnUNet_preprocessed="/home/bryan/data/mbas_nnUNet_preprocessed"
 export nnUNet_results="/home/bryan/expr/mbas_nnUNet_results"
@@ -21,12 +21,11 @@ export nnUNet_results="/home/bryan/expr/mbas_nnUNet_results"
 
 MODEL=3d_lowres
 MODEL=lowres1.0_M_16_256
-# MODEL=lowres1.25_M_16_256
+MODEL=lowres1.25_M_16_256
 # MODEL=lowres1.0_M_16_256_nblocks3
 # MODEL=3d_fullres
 # MODEL=fullres_M_16_256_nblocks3
 # MODEL=fullres_M_32_256_nblocks3
-MODEL=fullres_M_16_256_nblocks3
 PLANS=nnUNetResEncUNetMPlans_2024_08_10
 TRAINER=mbasTrainer
 nnUNetv2_train 104 $MODEL 0 -tr $TRAINER -p $PLANS

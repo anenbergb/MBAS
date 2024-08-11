@@ -9,7 +9,7 @@ from nnunetv2.training.loss.deep_supervision import DeepSupervisionWrapper
 from nnunetv2.utilities.helpers import dummy_context
 
 
-from mbas.training.nnUNetTrainer_MedNeXt import nnUNetTrainer_MedNeXt
+from mbas.training.mbasTrainer import mbasTrainer
 from mbas.training.compound_losses import DC_CE_HD_loss
 from mbas.utils.alpha_scheduler import (
     alpha_stepwise_warmup,
@@ -17,7 +17,7 @@ from mbas.utils.alpha_scheduler import (
 )
 
 
-class nnUNetTrainer_MedNeXt_CE_DC_HD(nnUNetTrainer_MedNeXt):
+class mbasTrainer_CE_DC_HD(mbasTrainer):
     def __init__(
         self,
         plans: dict,
