@@ -18,11 +18,3 @@ PLANS=nnUNetResEncUNetMPlans_2024_08_10
 MODEL=lowres1.0_M_40_256_nblocks3
 nnUNetv2_train 104 $MODEL 0 -tr $TRAINER -p $PLANS --c
 nnUNetv2_find_best_configuration 104 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
-
-MODEL=lowres1.25_M_40_256_nblocks3
-nnUNetv2_train 104 $MODEL 0 -tr $TRAINER -p $PLANS --c
-nnUNetv2_find_best_configuration 104 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
-
-MODEL=lowres1.5_M_40_256_nblocks3
-nnUNetv2_train 104 $MODEL 0 -tr $TRAINER -p $PLANS --c
-nnUNetv2_find_best_configuration 104 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling

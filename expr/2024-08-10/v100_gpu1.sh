@@ -4,7 +4,7 @@ eval "$(conda shell.bash hook)"
 export CUDA_VISIBLE_DEVICES=1
 CONDA=mbas
 conda activate $CONDA
-export PATH="/home/ubuntu/storage/miniconda3/bin:$PATH"
+# export PATH="/home/ubuntu/storage/miniconda3/bin:$PATH"
 export nnUNet_keep_files_open=1
 export nnUNet_n_proc_DA=4
 export nnUNet_raw="/home/bryan/data/nnUNet_raw"
@@ -14,10 +14,11 @@ export nnUNet_results="/home/ubuntu/storage/mbas_nnUNet_results"
 TRAINER=mbasTrainer
 PLANS=nnUNetResEncUNetMPlans_2024_08_10
 
-MODEL=lowres1.0_M_16_256
+# from 7
+MODEL=lowres1.25_M_40_256_nblocks3
 nnUNetv2_train 104 $MODEL 0 -tr $TRAINER -p $PLANS --c
 nnUNetv2_find_best_configuration 104 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
 
-MODEL=fullres_M_16_256
-nnUNetv2_train 104 $MODEL 0 -tr $TRAINER -p $PLANS --c
-nnUNetv2_find_best_configuration 104 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
+# MODEL=lowres1.0_M_16_256
+# nnUNetv2_train 104 $MODEL 0 -tr $TRAINER -p $PLANS --c
+# nnUNetv2_find_best_configuration 104 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
