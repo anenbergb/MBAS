@@ -32,6 +32,6 @@ nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --dis
 MODEL=fullres_M_32_128_nblocks3_decoder2
 nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS --c
 nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
-MODEL=fullres_M_16_256_nblocks3
+MODEL=fullres_M_16_256_nblocks3 # @ 528 = 5.3hrs
 nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS --c
 nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
