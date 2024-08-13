@@ -18,16 +18,19 @@ from mbas.data.constants import MBAS_SHORT_LABELS
 from mbas.data.nifti import load_subjects
 
 
-def compute_per_subject_metrics(subjects: list[tio.Subject], results_dir: str):
+def compute_per_subject_metrics(
+    subjects: list[tio.Subject],
+    results_dir: str,
+    label_key: str = "label",
+    label_dict: dict[int, str] = MBAS_SHORT_LABELS,
+):
     dice_metric = DiceMetric(
         include_background=False, reduction="mean", get_not_nans=False
     )
     hausdorff_metric = HausdorffDistanceMetric(
         include_background=False, percentile=95.0, directed=False
     )
-    to_onehot = Compose(
-        [AsDiscrete(to_onehot=len(MBAS_SHORT_LABELS)), lambda x: x[None]]
-    )
+    to_onehot = Compose([AsDiscrete(to_onehot=len(label_dict)), lambda x: x[None]])
 
     metrics_dict = []
     for subject in tqdm(subjects):
@@ -35,7 +38,7 @@ def compute_per_subject_metrics(subjects: list[tio.Subject], results_dir: str):
         if not os.path.exists(results_file):
             continue
         subject.add_image(tio.LabelMap(path=results_file), "predictions")
-        label_onehot = to_onehot(subject.label.data)
+        label_onehot = to_onehot(getattr(subject, label_key).data)
         predictions_onehot = to_onehot(subject.predictions.data)
         dice_score = dice_metric(y_pred=predictions_onehot, y=label_onehot)
         hausdorff_distance = hausdorff_metric(y_pred=predictions_onehot, y=label_onehot)
@@ -48,9 +51,9 @@ def compute_per_subject_metrics(subjects: list[tio.Subject], results_dir: str):
             "subject_id": subject.patient_id,
         }
         for i, dice in enumerate(dice123):
-            mdict[f"DSC_{MBAS_SHORT_LABELS[i+1]}"] = dice
+            mdict[f"DSC_{label_dict[i+1]}"] = dice
         for i, haus in enumerate(h123):
-            mdict[f"HD95_{MBAS_SHORT_LABELS[i+1]}"] = haus
+            mdict[f"HD95_{label_dict[i+1]}"] = haus
         metrics_dict.append(mdict)
     df = pd.DataFrame.from_records(metrics_dict)
     logger.info(
@@ -72,13 +75,25 @@ def make_average_table(df):
     return avg_df
 
 
-def per_subject_metrics(dataset_dir, results_dir, save_filepath):
-    subjects = load_subjects(dataset_dir)
+def per_subject_metrics(
+    dataset_dir, results_dir, save_filepath: str | None = None, label_key: str = "label"
+):
+    add_binary = label_key == "binary_label"
+    if label_key == "label":
+        label_dict = MBAS_SHORT_LABELS
+    elif label_key == "binary_label":
+        label_dict = {0: "background", 1: "atrium"}
+    else:
+        raise ValueError(f"Unknown label key {label_key}")
+    subjects = load_subjects(dataset_dir, add_binary=add_binary)
     logger.info(f"Loaded { len(subjects)} subjects")
-    df = compute_per_subject_metrics(subjects, results_dir)
-    os.makedirs(os.path.dirname(save_filepath), exist_ok=True)
-    df.to_pickle(save_filepath)
-    logger.info(f"Saved per subject metrics to {save_filepath}")
+    df = compute_per_subject_metrics(
+        subjects, results_dir, label_key=label_key, label_dict=label_dict
+    )
+    if save_filepath is not None:
+        os.makedirs(os.path.dirname(save_filepath), exist_ok=True)
+        df.to_pickle(save_filepath)
+        logger.info(f"Saved per subject metrics to {save_filepath}")
     avg_df = make_average_table(df)
     print(tabulate(avg_df, headers="keys", tablefmt="github"))
 
@@ -103,9 +118,19 @@ Compute Dice score and Hausdorff distance per subject.
         "--save",
         type=str,
     )
+    parser.add_argument(
+        "--label-key",
+        choices=["label", "binary_label"],
+        default="label",
+        type=str,
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = get_args()
-    sys.exit(per_subject_metrics(args.dataset_dir, args.results_dir, args.save))
+    sys.exit(
+        per_subject_metrics(
+            args.dataset_dir, args.results_dir, args.save, args.label_key
+        )
+    )

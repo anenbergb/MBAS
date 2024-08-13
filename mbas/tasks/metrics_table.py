@@ -32,6 +32,8 @@ COLUMN_ORDERS = [
     "HD95_right",
     "DSC_left",
     "HD95_left",
+    "DSC_atrium",
+    "HD95_atrium",
 ]
 
 
@@ -44,15 +46,27 @@ def find_results_directories(result_root_dir: str, match: str) -> list[str]:
 
 
 def compute_per_model_metrics(
-    subjects: list[tio.Subject], results_dirs: list[str], results_dir_match: str
+    subjects: list[tio.Subject],
+    results_dirs: list[str],
+    results_dir_match: str,
+    label_key: str = "label",
 ):
+    if label_key == "label":
+        label_dict = MBAS_SHORT_LABELS
+    elif label_key == "binary_label":
+        label_dict = {0: "background", 1: "atrium"}
+    else:
+        raise ValueError(f"Unknown label key {label_key}")
+
     avg_metrics_dict = []
     std_metrics_dict = []
     for results_dir in results_dirs:
         prefix = results_dir[: -len(results_dir_match)].rstrip("/")
         model_name = os.path.basename(prefix)
         logger.info(f"Processing {model_name}")
-        df = compute_per_subject_metrics(subjects, results_dir)
+        df = compute_per_subject_metrics(
+            subjects, results_dir, label_key=label_key, label_dict=label_dict
+        )
         avg_df = make_average_table(df)
         avg_dict = {
             "model": model_name,
@@ -98,6 +112,12 @@ def compute_average_rank(row):
     return avg
 
 
+def df_filter_reindex(df):
+    columns = df.columns
+    column_orders = [x for x in COLUMN_ORDERS if x in columns]
+    return df.reindex(columns=column_orders)
+
+
 def compute_per_model_ranks(df):
     metric_rank_list = [
         df["model"],
@@ -115,7 +135,7 @@ def compute_per_model_ranks(df):
     metric_rank_df["Avg_Rank"] = metric_rank_df[columns_of_interest].mean(axis=1)
     metric_rank_df = metric_rank_df.sort_values(by="Avg_Rank")
     metric_rank_df["Rank"] = np.arange(1, len(metric_rank_df) + 1)
-    metric_rank_df = metric_rank_df.reindex(columns=COLUMN_ORDERS)
+    metric_rank_df = df_filter_reindex(metric_rank_df)
     return metric_rank_df
 
 
@@ -123,7 +143,7 @@ def add_avg_rank(df, rank_df):
     df["Rank"] = rank_df["Rank"]
     df["Avg_Rank"] = rank_df["Avg_Rank"]
     df = df.sort_values(by="Avg_Rank")
-    df = df.reindex(columns=COLUMN_ORDERS)
+    df = df_filter_reindex(df)
     return df
 
 
@@ -150,18 +170,22 @@ def metrics_table(
     results_dir_match: str,
     cache_filepath: str | None = None,
     save_filepath: str | None = None,
+    label_key: str = "label",
 ):
-    subjects = load_subjects(dataset_dir)
+    subjects = load_subjects(dataset_dir, add_binary=label_key == "binary_label")
     logger.info(f"Loaded { len(subjects)} subjects")
 
     cache_dfs, cache_models = (
-        load_cache(cache_filepath) if cache_filepath else (None, [])
+        load_cache(cache_filepath)
+        if cache_filepath and os.path.exists(cache_filepath)
+        else (None, [])
     )
     if cache_dfs is not None:
         logger.info(f"Loaded {len(cache_models)} cached models")
         print(
             tabulate(cache_dfs["per_model_metrics"], headers="keys", tablefmt="github")
         )
+        print()
 
     results_dirs = []
     for root in root_results_dirs:
@@ -174,7 +198,7 @@ def metrics_table(
 
     logger.info(f"Processing {len(results_dirs)} results directories")
     per_model_metrics_df, per_model_std_df = compute_per_model_metrics(
-        subjects, results_dirs, results_dir_match
+        subjects, results_dirs, results_dir_match, label_key=label_key
     )
     if cache_dfs is not None:
         per_model_metrics_df = pd.concat(
@@ -200,6 +224,7 @@ def metrics_table(
     logger.info(f"Saved metrics to {save_filepath}")
     logger.info("Metrics Table:")
     print(tabulate(per_model_metrics_df, headers="keys", tablefmt="github"))
+    print()
     logger.info("Ranks Table:")
     print(tabulate(per_model_ranks_df, headers="keys", tablefmt="github"))
 
@@ -235,6 +260,12 @@ Compute Dice score and Hausdorff distance across all experiments.
         "--save",
         type=str,
     )
+    parser.add_argument(
+        "--label-key",
+        choices=["label", "binary_label"],
+        default="label",
+        type=str,
+    )
     return parser.parse_args()
 
 
@@ -247,5 +278,6 @@ if __name__ == "__main__":
             args.results_dir_match,
             args.cache,
             args.save,
+            args.label_key,
         )
     )

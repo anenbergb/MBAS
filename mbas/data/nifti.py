@@ -20,6 +20,7 @@ def make_subject(
     train_test_split: str = "train",
     extension: list[str] = [".nii", ".nii.gz"],
     add_heirarchical=False,
+    add_binary=False,
 ) -> tio.Subject:
     # patient_id_str is formatted "MBAS_002"
     patient_id_str = os.path.basename(folder_path)
@@ -50,16 +51,31 @@ def make_subject(
         )
 
     if add_heirarchical:
-        subject.add_image(
-            tio.LabelMap(
-                path=get_file_name(
-                    os.path.join(folder_path, f"{patient_id_str}_hierarchical_label"),
-                    extension,
-                ),
-                name="hierarchical_label",
-            ),
-            "hierarchical_label",
+        label_path = get_file_name(
+            os.path.join(folder_path, f"{patient_id_str}_hierarchical_label"),
+            extension,
         )
+        if label_path is not None and os.path.exists(label_path):
+            subject.add_image(
+                tio.LabelMap(
+                    label_path,
+                    name="hierarchical_label",
+                ),
+                "hierarchical_label",
+            )
+    if add_binary:
+        label_path = get_file_name(
+            os.path.join(folder_path, f"{patient_id_str}_binary_label"),
+            extension,
+        )
+        if label_path is not None and os.path.exists(label_path):
+            subject.add_image(
+                tio.LabelMap(
+                    path=label_path,
+                    name="binary_label",
+                ),
+                "binary_label",
+            )
     return subject
 
 
@@ -88,13 +104,27 @@ def get_subject_folders(dataset_folder: str) -> list[str]:
     return patient_folders
 
 
-def load_subjects(dataset_folder: str) -> list[tio.Subject]:
+def load_subjects(
+    dataset_folder: str,
+    add_heirarchical=False,
+    add_binary=False,
+) -> list[tio.Subject]:
 
     train_folders = get_subject_folders(os.path.join(dataset_folder, "Training"))
     val_folders = get_subject_folders(os.path.join(dataset_folder, "Validation"))
 
-    train_subjects = [make_subject(x, "train") for x in train_folders]
-    val_subjects = [make_subject(x, "validation") for x in val_folders]
+    train_subjects = [
+        make_subject(
+            x, "train", add_heirarchical=add_heirarchical, add_binary=add_binary
+        )
+        for x in train_folders
+    ]
+    val_subjects = [
+        make_subject(
+            x, "validation", add_heirarchical=add_heirarchical, add_binary=add_binary
+        )
+        for x in val_folders
+    ]
     subjects = train_subjects + val_subjects
     subjects = sorted(subjects, key=lambda x: x.patient_id)
     return subjects
