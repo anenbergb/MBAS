@@ -39,3 +39,5 @@ The 2nd stage models trained on the dilated ground truth masks performed worse t
 | 35 | nnUNetTrainer_MedNeXt__MedNeXtV2Plans_2024_08_09__cascade_mask_dil1_16_128_GT                                 |     42 |   38.5     |   0.71169  |     3.27481 |   0.917995  |      3.77168 |   0.924817 |     4.79825 |
 | 36 | nnUNetTrainer_MedNeXt__MedNeXtV2Plans_2024_08_09__cascade_mask_dil10_16_128_GT                                |     43 |   39       |   0.712861 |     3.24838 |   0.916315  |      3.88388 |   0.92475  |     4.86654 |
 ```
+![image](https://github.com/user-attachments/assets/4b8d1737-ffc5-47e2-a349-74c691a0fa2c)
+![image](https://github.com/user-attachments/assets/64213865-404e-4f8c-aedc-7dcd52cc9d49)
