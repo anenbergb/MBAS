@@ -10,15 +10,15 @@ export nnUNet_preprocessed="/home/ubuntu/storage/mbas_nnUNet_preprocessed"
 export nnUNet_results="/home/ubuntu/storage/mbas_nnUNet_results"
 
 python mbas/tasks/prepare_cascade_model_from_gt.py \
---plans $nnUNet_preprocessed/Dataset101_MBAS/MedNeXtV2Plans_2024_08_13_GT.json \
+--plans $nnUNet_preprocessed/Dataset101_MBAS/nnUNetResEncUNetMPlans_2024_08_13_GT.json \
 --results-dir $nnUNet_results/Dataset101_MBAS \
 --dataset-preprocess-dir $nnUNet_preprocessed/Dataset101_MBAS/nnUNetPlans_3d_fullres \
 --trainer mbasTrainer \
 --save-ground-truth
 
 TRAINER=mbasTrainer
-PLANS=MedNeXtV2Plans_2024_08_13_GT
-MODEL=16_256_nblocks2_cascade_GT
+PLANS=nnUNetResEncUNetMPlans_2024_08_13_GT
+MODEL=16_256_cascade_GT
 
 nnUNetv2_train 101 $MODEL all -tr $TRAINER -p $PLANS
 # nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 1 2 3 4 --disable_ensembling
