@@ -18,22 +18,38 @@ from batchgenerators.utilities.file_and_folder_operations import load_json
 from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
 
 
-def get_prev_stage_validation_predictions(prev_stage: str):
+def get_prev_stage_validation_predictions(
+    prev_stage: str, use_crossval_postprocessed: bool = False
+):
     """
     Get the validation predictions from the previous stage.
     """
     predictions = []
     for i in range(5):
-        fold_dir = os.path.join(prev_stage, f"fold_{i}/validation")
-        for file in os.listdir(fold_dir):
-            if file.endswith(".nii.gz"):
-                predictions.append(os.path.join(fold_dir, file))
+        if use_crossval_postprocessed:
+            fold_dir = os.path.join(
+                prev_stage, f"crossval_results_folds_{i}/postprocessed"
+            )
+        else:
+            fold_dir = os.path.join(prev_stage, f"fold_{i}/validation")
+        if os.path.exists(fold_dir):
+            for file in os.listdir(fold_dir):
+                if file.endswith(".nii.gz"):
+                    predictions.append(os.path.join(fold_dir, file))
+        else:
+            logger.warning(f"Could not find {fold_dir}")
     predictions = sorted(predictions)
     return predictions
 
 
 def prepare_cascade_model(
-    plans_json, results_dir, prev_stage, dataset_preprocess_dir, rel_save_dir, trainer
+    plans_json: str,
+    results_dir: str,
+    prev_stage_dir: str,
+    dataset_preprocess_dir: str,
+    rel_save_dir: str,
+    trainer: str,
+    use_crossval_postprocessed: bool = False,
 ):
     plans_json = load_json(plans_json)
     plans_manager = PlansManager(plans_json)
@@ -51,8 +67,9 @@ def prepare_cascade_model(
         f"Found {len(configs_with_prev_stage)} configurations with a previous stage named: {prev_stage_name}"
     )
 
-    prev_stage_dir = os.path.join(results_dir, prev_stage)
-    validation_predictions = get_prev_stage_validation_predictions(prev_stage_dir)
+    validation_predictions = get_prev_stage_validation_predictions(
+        prev_stage_dir, use_crossval_postprocessed=use_crossval_postprocessed
+    )
     logger.info(
         f"Found {len(validation_predictions)} validation predictions from {prev_stage_dir}"
     )
@@ -111,7 +128,7 @@ Prepare cascade model by cropping the validation predictions from a prior model 
         type=str,
     )
     parser.add_argument(
-        "--prev-stage",
+        "--prev-stage-dir",
         default="nnUNetTrainer_MedNeXt__MedNeXtPlans__3d_fullres",
         type=str,
     )
@@ -131,6 +148,13 @@ Prepare cascade model by cropping the validation predictions from a prior model 
         default="nnUNetTrainer_MedNeXt",
         type=str,
     )
+    parser.add_argument(
+        "--use-crossval-postprocessed",
+        action="store_true",
+        default=False,
+        help="Use cross-validation postprocessed results (default: False)",
+    )
+
     return parser.parse_args()
 
 
@@ -140,9 +164,10 @@ if __name__ == "__main__":
         prepare_cascade_model(
             args.plans,
             args.results_dir,
-            args.prev_stage,
+            args.prev_stage_dir,
             args.dataset_preprocess_dir,
             args.save_dir,
             args.trainer,
+            args.use_crossval_postprocessed,
         )
     )
