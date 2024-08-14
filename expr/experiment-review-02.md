@@ -6,6 +6,14 @@ Previously I experimented with 2-stage models in the style of nnU-Net where the 
 
 An alternative formulation of the 2-stage cascaded method is to predict a binary foreground mask with the 1st stage model, and to use this binary mask in the 2nd stage to reduce the search space when performing the multi-class segmentation. The 1st stage binary mask is applied to the loss function. The cross-entropy loss is zeroed out for regions outside the binary mask. The 2nd stage model is trained to only focus on regions within the binary mask.
 
+I implemented `mbasTrainer.py`, updated the data loaders, and updated the loss functions such that the binary mask is applied to the loss function.
+The 2nd stage models are also trained to oversample the foreground, because these is no value to training on the background since the 1st stage model will handle localization of the segmentation regions.
+```
+    oversample_foreground_percent = 1.0,
+    probabilistic_oversampling = True,
+    sample_class_probabilities = {1: 0.5, 2: 0.25, 3: 0.25}
+```
+
 ### Cascaded 2nd stage model trained using ground truth binary mask
 To prove that the 2-stage cascaded mask method can improve performance verse a single-stage model, I trained the 2nd stage model using the ground truth binary mask. The ground truth 3-class segmentation masks were binarized and used as if they were the predictions from the 1st stage model.
 
@@ -41,3 +49,11 @@ The 2nd stage models trained on the dilated ground truth masks performed worse t
 ```
 ![image](https://github.com/user-attachments/assets/4b8d1737-ffc5-47e2-a349-74c691a0fa2c)
 ![image](https://github.com/user-attachments/assets/64213865-404e-4f8c-aedc-7dcd52cc9d49)
+
+## Cascaded 1st stage models
+
+## Experiments Titrating the Hausdorff Lossf
+
+## Adding more filters and blocks in the first few stages
+
+## Adding dilation

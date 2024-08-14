@@ -17,8 +17,8 @@ python mbas/tasks/prepare_cascade_model_from_gt.py \
 --save-ground-truth
 
 TRAINER=mbasTrainer
-PLANS=MedNeXtV2Plans_2024_08_13
-MODEL=16_256_cascade_3d_low_res
+PLANS=MedNeXtV2Plans_2024_08_13_GT
+MODEL=16_256_cascade_GT
 
 nnUNetv2_train 101 $MODEL all -tr $TRAINER -p $PLANS --c
 nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f all --disable_ensembling
