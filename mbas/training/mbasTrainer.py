@@ -713,6 +713,9 @@ class mbasTrainer(nnUNetTrainer):
         if self.is_cascaded and self.is_cascaded_mask:
             mask = target[:, 1:2]
             target = target[:, 0:1]
+            # TODO: check whether there are any negative values in this mask
+            # if so, set them to seg[seg < 0] = 0
+
             if self.label_manager.has_ignore_label:
                 raise NotImplementedError(
                     "has_ignore_label not supported for cascaded mask"
@@ -876,6 +879,8 @@ class mbasTrainer(nnUNetTrainer):
                 if self.is_cascaded and self.is_cascaded_mask:
                     # prediction.shape (4,44,574,574)
                     # mask shape (1,44,574,574)
+                    # TODO: check whether there are any negative values in this mask
+                    # if so, set them to seg[seg < 0] = 0
                     mask = torch.from_numpy(seg[1:2]).to(torch.bool)
                     if self.cascaded_mask_dilation > 0:
                         mask[0] = binary_dilation_transform(
