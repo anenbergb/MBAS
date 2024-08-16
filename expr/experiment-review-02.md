@@ -1,7 +1,29 @@
 
+## nnU-Net style Cascaded Model (2 stage Models)
+The nnU-Net style cascaded 2-stage models require training a 1st stage model (usually on the low resolution input) and then providing the predicted segmentation mask as an additional input channel to the 2nd stage model. The segmentation mask is one-hot encoded. 
+The 1st stage model needs to be trained with 5-fold cross validation such that there are predicted segmentation mask for each of the volumes in the training dataset.
+In the following set of experiments I used the `Dataset101_MBAS/nnUNetTrainer_MedNeXt__MedNeXtPlans__3d_fullres` as the 1st stage model. 
+
+The 2nd sstage cascaded models were trained with a smaller input resolution (
+The 2nd stage cascaded models marked with `_patch96` were trained with a `16, 96, 96)` input patch size, the `_patch128` have a `(16, 128, 128)` patch size, and the other models default to `(16, 256, 256)` patch size. The `oversample025` refers to oversampling patches from the foreground with 25% probability `oversample_foreground_percent=0.25`. `even_128` modifies the features_per_stage from `(32, 64, 128, 128, 128, 128)` to `(128, 128, 128, 128, 128, 128)`.
+
+As observed from the results, the nnU-Net style cascade results in worse performance.
+```
+|    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
+|----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
+|  2 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   10       |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
+|  3 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05 (not cascaded)                         |     10 |   11       |   0.723894 |     2.84257 |   0.925716  |      3.03093 |   0.932273 |     3.93802 |
+| 17 | nnUNetTrainer_MedNeXt__MedNeXtPlans__3d_fullres (1st stage model)                                             |     20 |   23.8333  |   0.722514 |     3.25905 |   0.923382  |      3.17257 |   0.927485 |     4.59637 |
+| 19 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_29__slim_128_oversample_05                                        |     23 |   26.1667  |   0.720507 |     3.06413 |   0.921079  |      3.50887 |   0.92784  |     4.24393 |
+| 21 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_29__slim_128_patch96_oversample025                                |     24 |   26.1667  |   0.725279 |     3.27665 |   0.921329  |      3.28679 |   0.9265   |     4.43997 |
+| 26 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_29__slim_128_patch128_oversample025                               |     29 |   30       |   0.724519 |     3.3604  |   0.922292  |      3.34179 |   0.926154 |     4.62622 |
+| 27 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_29__even_128_patch96_oversample025                                |     30 |   31       |   0.725081 |     3.40352 |   0.919901  |      3.45598 |   0.926357 |     4.50093 |
+| 57 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_29__slim_128_patch96                                              |     62 |   62.3333  |   0.146329 |   263.014   |   0.0900617 |    331.977   |   0.725738 |    51.2939  |
+| 58 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_29__even_128_patch96                                              |     63 |   62.6667  |   0.259363 |   139.727   |   0.078797  |    336.276   |   0.719992 |    56.1046  |
+```
 
 
-## Cascaded Models
+## Dr. Chang Style Cascaded Models (2 Stage Models)
 Previously I experimented with 2-stage models in the style of nnU-Net where the 1st stage predictions are provided to the 2nd stage model as an additional channel input, such that the 2nd stage model can refine the predictions. In this setup, the 1st stage model generates a coarse prediction, and the 2nd stage model cleans up the prediction. My prior experiments did not find any value in this approach. A high quality single-stage model outperformed the 2 stage cascaded model.
 
 An alternative formulation of the 2-stage cascaded method is to predict a binary foreground mask with the 1st stage model, and to use this binary mask in the 2nd stage to reduce the search space when performing the multi-class segmentation. The 1st stage binary mask is applied to the loss function. The cross-entropy loss is zeroed out for regions outside the binary mask. The 2nd stage model is trained to only focus on regions within the binary mask.
@@ -17,7 +39,7 @@ The 2nd stage models are also trained to oversample the foreground, because thes
 ### Cascaded 2nd stage model trained using ground truth binary mask
 To prove that the 2-stage cascaded mask method can improve performance verse a single-stage model, I trained the 2nd stage model using the ground truth binary mask. The ground truth 3-class segmentation masks were binarized and used as if they were the predictions from the 1st stage model.
 
-All 2nd stage models trained with this approach significantly outperformed the single-stage models. This result proves that IF we can achieve a high-quality 1st stage binary segmentation, then the 2nd stage model can significantly improve in accuracy.
+All 2nd stage models trained with this approach significantly outperformed the single-stage models. This result proves that if we can train a high-quality 1st stage binary segmentation model, then the 2nd stage model can significantly improve in accuracy.
 ```
 |    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
 |----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
@@ -50,10 +72,56 @@ The 2nd stage models trained on the dilated ground truth masks performed worse t
 ![image](https://github.com/user-attachments/assets/4b8d1737-ffc5-47e2-a349-74c691a0fa2c)
 ![image](https://github.com/user-attachments/assets/64213865-404e-4f8c-aedc-7dcd52cc9d49)
 
-## Cascaded 1st stage models
+### Cascaded 1st stage models
+The objective of the 1st stage model is to perform binary segmentation of left and right atrium -- i.e the goal is to segment the foreground (heart atrium) from the background. The ground truth 3-class segmentation masks were binarized and used as labels.
+
+I trained a variety of `nnUNetResEncUNetM` models. I experimented with different input resolutions and spacings. The default spacing for the MBAS dataset is `[2.5, 1.5, 1.5]` with MRI volume size of either `[44,638,638]` or `[44,574,574]`. The MRI volumes were downsampled to "3d_lowres" `[2.5, 0.9737296353754783, 0.9737296353754783]` spacing with volume size `[2.5, 410, 410]`, "3d_lowres_1.0" '[2.5, 1.0, 1.0]` spacing with volume size `[44, 399, 399]`, "3d_lowres_1.25" `[2.5, 1.25, 1.25]` spacing with volume size `[ 44, 319, 319]`, and "3d_lowres_1.5" `[2.5, 1.5, 1.5]` spacing with volume size `[ 44, 266, 266]`.
+I experimented with variety of input resolutions including `[16, 256, 256]`, [32, 256, 256]`, `[40, 256, 256]`, `[20, 256, 256]` for the default "3d_fullres" model, and `[28, 256, 224]` for the default 3d_lowres model. `nblocks3` refers to the number of ResidualBlocks in the first stage of the Residual Encoder.
+```
+|    | model                                                                        |   Rank |   Avg_Rank |   DSC_atrium |   HD95_atrium |
+|----|------------------------------------------------------------------------------|--------|------------|--------------|---------------|
+|  0 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres                    |      1 |        1.5 |     0.934025 |       3.39874 |
+|  1 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_16_256           |      2 |        2.5 |     0.933949 |       3.41017 |
+| 10 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_40_256_nblocks3  |      3 |        2.5 |     0.933596 |       3.32731 |
+|  2 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_16_256_nblocks3  |      4 |        3.5 |     0.933803 |       3.4339  |
+|  3 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.25_M_16_256_nblocks3 |      5 |        5   |     0.933403 |       3.48028 |
+|  9 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_fullres                   |      6 |        6   |     0.932549 |       3.51358 |
+|  4 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.25_M_16_256          |      7 |        7.5 |     0.932349 |       3.58482 |
+|  5 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.5_M_16_256_nblocks3  |      8 |        7.5 |     0.931221 |       3.54931 |
+|  6 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.5_M_16_256           |      9 |        9   |     0.930668 |       3.63163 |
+|  7 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_32_256_nblocks3    |     10 |       10   |     0.473494 |     119.312   |
+|  8 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_32_256             |     11 |       11   |     0.472544 |     137.721   |
+```
 
 ## Experiments Titrating the Hausdorff Lossf
+Previously I integrated the HausdorffDTLoss implemented in monai into nnUNetv2 and followed the training policy of https://arxiv.org/abs/1904.10030 and https://arxiv.org/pdf/2302.03868v3 where I just increased the relative weight of the Hausdorff Distance (HD) loss from 0 to 100% using a stepwise linear function, updated every 5 (or 10) epochs. This prior round of experiments is captured below (models #51 and #53 in the table below).
+With second round of experiments I added a 250 (or 500) epoch warmup such that the HD loss would not be added until the model trained at least 250 (or 500) epochs with the normal losses -- Cross Entropy loss and Dice Loss. Only after 250 (or 500) epochs would the HD loss be added. The weight of the HD loss would increase via a stepwise linear function updated every 5 epochs to a maximum of 0.25 (or 0.50, or 0.75) weight balanced agains the Cross Entropy and Dice Loss. I.e. `loss = (1 - alpha) * (CE_loss + Dice_loss) + alpha * HD_loss`. The `scaled` suffix to the below experiments refers to scaling up the HD_loss weight (alpha) from 0 to the maximum (e.g. 0.25) over the full range of steps from warmup epoch (e.g. 250) to final epoch (e.g. 1000). With scaled, the alpha equation is `alpha = max_alpha * (steps / total_steps)` whereas without scaled the alpha equation is `min(steps / total_steps, max_alpha)`.
 
+This round of experiments were unsuccessful. The models with added HD loss performed worse. 
+
+```
+|    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
+|----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
+|  2 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   10       |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
+|  3 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05                                        |     10 |   11       |   0.723894 |     2.84257 |   0.925716  |      3.03093 |   0.932273 |     3.93802 |
+| 31 | nnUNetTrainer_MedNeXt_CE_DC_HD__MedNeXtPlans_2024_08_03__slim_128_oversample_05_alpha05_warm500_max025_scaled |     35 |   35.8333  |   0.716094 |     3.93379 |   0.919007  |      3.78956 |   0.927351 |     4.3387  |
+| 47 | nnUNetTrainer_MedNeXt_CE_DC_HD__MedNeXtPlans_2024_08_03__slim_128_oversample_05_alpha05_warm250_max050_scaled |     51 |   47.3333  |   0.701808 |     4.83751 |   0.914622  |      4.34904 |   0.924663 |     4.9939  |
+| 48 | nnUNetTrainer_MedNeXt_CE_DC_HD__MedNeXtPlans_2024_08_03__slim_128_oversample_05_alpha05_warm250_max050        |     52 |   48.1667  |   0.693073 |     5.14332 |   0.912897  |      4.2309  |   0.922697 |     4.68495 |
+| 50 | nnUNetTrainer_MedNeXt_CE_DC_HD__MedNeXtPlans_2024_08_03__slim_128_oversample_05_alpha05_warm250_max075        |     54 |   51.1667  |   0.677776 |     6.02175 |   0.908245  |      4.26035 |   0.920219 |     5.22969 |
+| 51 | nnUNetTrainer_MedNeXt_CE_DC_HD__MedNeXtPlans_2024_07_26__slim_128_alpha10                                     |     55 |   53.3333  |   0.592409 |     9.04654 |   0.886964  |      5.78562 |   0.905886 |     8.65668 |
+| 53 | nnUNetTrainer_MedNeXt_CE_DC_HD__MedNeXtPlans_2024_07_26__slim_128_alpha05                                     |     56 |   54.6667  |   0.551918 |    10.1797  |   0.869174  |      7.87584 |   0.895517 |     9.4183  |
+```
 ## Adding more filters and blocks in the first few stages
 
+
 ## Adding dilation
+
+
+
+
+
+Dataset101_MBAS/mbasTrainer__MedNeXtV2Plans_2024_08_13__16_256_nblocks2_cascade_3d_low_res
+- overfitting to the training data. validation loss diverged.
+
+
+

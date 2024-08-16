@@ -9,12 +9,14 @@ The best performing model was one with input patch size (16, 256, 256), 7 stages
 ```
 ## Experiment 2: Modify patch sampling policy at training time
 This experiment worked! Results improved across all metrics.
-The default nnUNet patch sampling policy is random sampling. I tried a new policy to 100% of the time sample patches containing foreground object. 50% of the time centered on a "Atrium Wall", 25% of the time centered on "Right Atrium" and 25% of the time centered on "Left Atrium"
+The default nnUNet patch sampling policy is random sampling. I tried a new policy to 100% of the time sample patches containing foreground object. 50% of the time centered on a "Atrium Wall", 25% of the time centered on "Right Atrium" and 25% of the time centered on "Left Atrium". This worked better than oversampling the "Atrium Wall" 80% of the time and the other two regions 10% of the time.
 ```
 |    | model                                                                                       |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
 |----|---------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
-|  0 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05                      |      1 |    2.16667 |   0.723894 |     2.84257 |   0.925716  |      3.03093 |   0.932273 |     3.93802 |
-|  4 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_21__slim_128                                    |      5 |    9.16667 |   0.723578 |     3.32642 |   0.924154  |      3.10856 |   0.927038 |     4.50409 |
+|  0 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05                      |     10 |    11.5    |   0.723894 |     2.84257 |   0.925716  |      3.03093 |   0.932273 |     3.93802 |
+| 16 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_21__slim_128                                    |     18 |   23.3333  |   0.723578 |     3.32642 |   0.924154  |      3.10856 |   0.927038 |     4.50409 |
+| 28 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_08                      |     31 |   33.8333  |   0.719572 |     3.10795 |   0.733692  |     53.5099  |   0.929041 |     4.01647 |
+
 ```
 ## Experiment 3: Introduce Hausdorff Distance loss
 This experiment did not work!
