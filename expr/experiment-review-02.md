@@ -1,7 +1,29 @@
 
+## nnU-Net style Cascaded Model (2 stage Models)
+The nnU-Net style cascaded 2-stage models require training a 1st stage model (usually on the low resolution input) and then providing the predicted segmentation mask as an additional input channel to the 2nd stage model. The segmentation mask is one-hot encoded. 
+The 1st stage model needs to be trained with 5-fold cross validation such that there are predicted segmentation mask for each of the volumes in the training dataset.
+In the following set of experiments I used the `Dataset101_MBAS/nnUNetTrainer_MedNeXt__MedNeXtPlans__3d_fullres` as the 1st stage model. 
+
+The 2nd sstage cascaded models were trained with a smaller input resolution (
+The 2nd stage cascaded models marked with `_patch96` were trained with a `16, 96, 96)` input patch size, the `_patch128` have a `(16, 128, 128)` patch size, and the other models default to `(16, 256, 256)` patch size. The `oversample025` refers to oversampling patches from the foreground with 25% probability `oversample_foreground_percent=0.25`. `even_128` modifies the features_per_stage from `(32, 64, 128, 128, 128, 128)` to `(128, 128, 128, 128, 128, 128)`.
+
+As observed from the results, the nnU-Net style cascade results in worse performance.
+```
+|    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
+|----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
+|  2 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   10       |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
+|  3 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05 (not cascaded)                         |     10 |   11       |   0.723894 |     2.84257 |   0.925716  |      3.03093 |   0.932273 |     3.93802 |
+| 17 | nnUNetTrainer_MedNeXt__MedNeXtPlans__3d_fullres (1st stage model)                                             |     20 |   23.8333  |   0.722514 |     3.25905 |   0.923382  |      3.17257 |   0.927485 |     4.59637 |
+| 19 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_29__slim_128_oversample_05                                        |     23 |   26.1667  |   0.720507 |     3.06413 |   0.921079  |      3.50887 |   0.92784  |     4.24393 |
+| 21 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_29__slim_128_patch96_oversample025                                |     24 |   26.1667  |   0.725279 |     3.27665 |   0.921329  |      3.28679 |   0.9265   |     4.43997 |
+| 26 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_29__slim_128_patch128_oversample025                               |     29 |   30       |   0.724519 |     3.3604  |   0.922292  |      3.34179 |   0.926154 |     4.62622 |
+| 27 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_29__even_128_patch96_oversample025                                |     30 |   31       |   0.725081 |     3.40352 |   0.919901  |      3.45598 |   0.926357 |     4.50093 |
+| 57 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_29__slim_128_patch96                                              |     62 |   62.3333  |   0.146329 |   263.014   |   0.0900617 |    331.977   |   0.725738 |    51.2939  |
+| 58 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_29__even_128_patch96                                              |     63 |   62.6667  |   0.259363 |   139.727   |   0.078797  |    336.276   |   0.719992 |    56.1046  |
+```
 
 
-## Cascaded Models (2 Stage Models)
+## Dr. Chang Style Cascaded Models (2 Stage Models)
 Previously I experimented with 2-stage models in the style of nnU-Net where the 1st stage predictions are provided to the 2nd stage model as an additional channel input, such that the 2nd stage model can refine the predictions. In this setup, the 1st stage model generates a coarse prediction, and the 2nd stage model cleans up the prediction. My prior experiments did not find any value in this approach. A high quality single-stage model outperformed the 2 stage cascaded model.
 
 An alternative formulation of the 2-stage cascaded method is to predict a binary foreground mask with the 1st stage model, and to use this binary mask in the 2nd stage to reduce the search space when performing the multi-class segmentation. The 1st stage binary mask is applied to the loss function. The cross-entropy loss is zeroed out for regions outside the binary mask. The 2nd stage model is trained to only focus on regions within the binary mask.
@@ -90,6 +112,7 @@ This round of experiments were unsuccessful. The models with added HD loss perfo
 | 53 | nnUNetTrainer_MedNeXt_CE_DC_HD__MedNeXtPlans_2024_07_26__slim_128_alpha05                                     |     56 |   54.6667  |   0.551918 |    10.1797  |   0.869174  |      7.87584 |   0.895517 |     9.4183  |
 ```
 ## Adding more filters and blocks in the first few stages
+
 
 ## Adding dilation
 
