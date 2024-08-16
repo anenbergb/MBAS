@@ -1,7 +1,7 @@
 
 
 
-## Cascaded Models
+## Cascaded Models (2 Stage Models)
 Previously I experimented with 2-stage models in the style of nnU-Net where the 1st stage predictions are provided to the 2nd stage model as an additional channel input, such that the 2nd stage model can refine the predictions. In this setup, the 1st stage model generates a coarse prediction, and the 2nd stage model cleans up the prediction. My prior experiments did not find any value in this approach. A high quality single-stage model outperformed the 2 stage cascaded model.
 
 An alternative formulation of the 2-stage cascaded method is to predict a binary foreground mask with the 1st stage model, and to use this binary mask in the 2nd stage to reduce the search space when performing the multi-class segmentation. The 1st stage binary mask is applied to the loss function. The cross-entropy loss is zeroed out for regions outside the binary mask. The 2nd stage model is trained to only focus on regions within the binary mask.
@@ -17,7 +17,7 @@ The 2nd stage models are also trained to oversample the foreground, because thes
 ### Cascaded 2nd stage model trained using ground truth binary mask
 To prove that the 2-stage cascaded mask method can improve performance verse a single-stage model, I trained the 2nd stage model using the ground truth binary mask. The ground truth 3-class segmentation masks were binarized and used as if they were the predictions from the 1st stage model.
 
-All 2nd stage models trained with this approach significantly outperformed the single-stage models. This result proves that IF we can achieve a high-quality 1st stage binary segmentation, then the 2nd stage model can significantly improve in accuracy.
+All 2nd stage models trained with this approach significantly outperformed the single-stage models. This result proves that if we can train a high-quality 1st stage binary segmentation model, then the 2nd stage model can significantly improve in accuracy.
 ```
 |    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
 |----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
@@ -50,10 +50,39 @@ The 2nd stage models trained on the dilated ground truth masks performed worse t
 ![image](https://github.com/user-attachments/assets/4b8d1737-ffc5-47e2-a349-74c691a0fa2c)
 ![image](https://github.com/user-attachments/assets/64213865-404e-4f8c-aedc-7dcd52cc9d49)
 
-## Cascaded 1st stage models
+### Cascaded 1st stage models
+The objective of the 1st stage model is to perform binary segmentation of left and right atrium -- i.e the goal is to segment the foreground (heart atrium) from the background. The ground truth 3-class segmentation masks were binarized and used as labels.
+
+I trained a variety of `nnUNetResEncUNetM` models. I experimented with different input resolutions and spacings. The default spacing for the MBAS dataset is `[2.5, 1.5, 1.5]` with MRI volume size of either `[44,638,638]` or `[44,574,574]`. The MRI volumes were downsampled to "3d_lowres" `[2.5, 0.9737296353754783, 0.9737296353754783]` spacing with volume size `[2.5, 410, 410]`, "3d_lowres_1.0" '[2.5, 1.0, 1.0]` spacing with volume size `[44, 399, 399]`, "3d_lowres_1.25" `[2.5, 1.25, 1.25]` spacing with volume size `[ 44, 319, 319]`, and "3d_lowres_1.5" `[2.5, 1.5, 1.5]` spacing with volume size `[ 44, 266, 266]`.
+I experimented with variety of input resolutions including `[16, 256, 256]`, [32, 256, 256]`, `[40, 256, 256]`, `[20, 256, 256]` for the default "3d_fullres" model, and `[28, 256, 224]` for the default 3d_lowres model. `nblocks3` refers to the number of ResidualBlocks in the first stage of the Residual Encoder.
+```
+|    | model                                                                        |   Rank |   Avg_Rank |   DSC_atrium |   HD95_atrium |
+|----|------------------------------------------------------------------------------|--------|------------|--------------|---------------|
+|  0 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres                    |      1 |        1.5 |     0.934025 |       3.39874 |
+|  1 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_16_256           |      2 |        2.5 |     0.933949 |       3.41017 |
+| 10 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_40_256_nblocks3  |      3 |        2.5 |     0.933596 |       3.32731 |
+|  2 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_16_256_nblocks3  |      4 |        3.5 |     0.933803 |       3.4339  |
+|  3 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.25_M_16_256_nblocks3 |      5 |        5   |     0.933403 |       3.48028 |
+|  9 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_fullres                   |      6 |        6   |     0.932549 |       3.51358 |
+|  4 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.25_M_16_256          |      7 |        7.5 |     0.932349 |       3.58482 |
+|  5 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.5_M_16_256_nblocks3  |      8 |        7.5 |     0.931221 |       3.54931 |
+|  6 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.5_M_16_256           |      9 |        9   |     0.930668 |       3.63163 |
+|  7 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_32_256_nblocks3    |     10 |       10   |     0.473494 |     119.312   |
+|  8 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_32_256             |     11 |       11   |     0.472544 |     137.721   |
+```
 
 ## Experiments Titrating the Hausdorff Lossf
 
 ## Adding more filters and blocks in the first few stages
 
 ## Adding dilation
+
+
+
+
+
+Dataset101_MBAS/mbasTrainer__MedNeXtV2Plans_2024_08_13__16_256_nblocks2_cascade_3d_low_res
+- overfitting to the training data. validation loss diverged.
+
+
+
