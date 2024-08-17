@@ -29,8 +29,8 @@ The default nnUNet patch sampling policy is random sampling. I tried a new polic
 ## 2024-08-01 MedNeXt 128 feature per stage experiments
 Performed a collection of experiments with the MedNeXt network on (16, 256, 256) size input. Number of features per stage were capped at 128.
 Conclusions
-* Oversampling 85% of the time (slim_128_oversample_for085) performed worse than oversampling 100% of the time (slim_128_oversample_05) or no oversampling.
-* Adding additional feature channels to the early stages hurt performance.
+* Oversampling 85% of the time (slim_128_oversample_for085) performed worse than oversampling 100% of the time (slim_128_oversample_05) or no oversampling. Both training runs used the same policy of sampling patches centered at the "Atrium Wall" 50% of the time.
+* Adding additional feature channels to the early stages hurt performance, possibly due to overfitting.
 
 ```
 |    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
