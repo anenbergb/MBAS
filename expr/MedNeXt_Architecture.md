@@ -1,6 +1,23 @@
 I've run quite a few experiments over the past few weeks with the goal of improving Dice and HD95 scores. Some of the minor architectural changes helped and the updated patch sampling policy helped. However, training with Hausdorff Distance loss and 2-stage Cascaded models didn't help.
 
-## Experiment 1: Various MedNeXt minor architectural changes.
+## Early MedNeXt experiments
+
+* `3d_01` patch size `(32, 256, 256)`, features per stage `(64, 128, 256, 256)`, kernel sizes of `(1,5,5), (3,5,5), (3,5,5), (1,5,5)`, stem kernel = 2, n_blocks_per_stage = [3,3,9,3], decoder only has 1x blocks and 1x expansion
+* `3d_02` is same as `3d_01` but with stem_kernel_size=(2,4,4) and more stride in first block, `(2,4,4)` rather than `(2,2,2)`.
+* `3d_03` has patch size `(16, 256, 256)` but with stem_kernel_size = 1, 5x5 kernels, and a slim decoder.
+* baseline_no_override patch size `(16, 256, 256)` and override_down_kernel_size = False. 7 stages. 3x3 convs
+```
+|    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
+|----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
+
+| 14 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_18__3d_01                                                         |     17 |   22.8333  |   0.712298 |     3.00992 |   0.921867  |      3.17019 |   0.926647 |     3.83216 |
+| 22 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_18__baseline_no_override                                          |     25 |   26.3333  |   0.722378 |     3.1792  |   0.922252  |      3.25888 |   0.927101 |     4.60908 |
+| 24 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_18__3d_02                                                         |     26 |   27.8333  |   0.704201 |     2.93458 |   0.919135  |      3.31624 |   0.926252 |     3.96765 |
+| 25 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_18__3d_04                                                         |     28 |   29.1667  |   0.7021   |     3.11244 |   0.920124  |      3.2303  |   0.925533 |     4.25802 |
+| 36 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_18__3d_03                                                         |     39 |   36.5     |   0.71435  |     3.27504 |   0.916747  |      3.76198 |   0.925979 |     4.36965 |
+```
+
+## Various MedNeXt minor architectural changes.
 The best performing model was one with input patch size (16, 256, 256), 7 stages that ultimately downsample the input to (1, 4, 4), retained symmetric number of blocks and expansion ratios in the U-Net decoder layers as in the U-Net encoder, and capped the maximum number of channels in the final layers to only 128! features_per_stage: (32, 64, 128, 128, 128, 128, 128)
 * decoder_1_block limited `n_blocks_per_stage_decoder = [1] * 7`
 * decoder_1_exp_ratio limited `exp_ratio_per_stage_decoder = [1] * 7`
@@ -13,7 +30,7 @@ The best performing model was one with input patch size (16, 256, 256), 7 stages
 ```
 
 
-## Experiment 2: Modify patch sampling policy at training time
+## Modify patch sampling policy at training time
 This experiment worked! Results improved across all metrics.
 The default nnUNet patch sampling policy is random sampling. I tried a new policy to 100% of the time sample patches containing foreground object. 50% of the time centered on a "Atrium Wall", 25% of the time centered on "Right Atrium" and 25% of the time centered on "Left Atrium". This worked better than oversampling the "Atrium Wall" 80% of the time and the other two regions 10% of the time.
 ```
