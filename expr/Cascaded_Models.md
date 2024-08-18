@@ -93,14 +93,7 @@ I experimented with variety of input resolutions including `[16, 256, 256]`, [32
 |  8 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_32_256             |     11 |       11   |     0.472544 |     137.721   |
 ```
 
-## Adding dilation
-
-
-
-
-
-Dataset101_MBAS/mbasTrainer__MedNeXtV2Plans_2024_08_13__16_256_nblocks2_cascade_3d_low_res
-- overfitting to the training data. validation loss diverged.
+Since the `mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres` model performed the best, I decided to use that as the 1st stage model for the 08-13 experiments that I ultimately used for the 2nd and 3rd validation set submissions.
 
 
 
