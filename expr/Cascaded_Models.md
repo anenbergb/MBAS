@@ -94,7 +94,9 @@ I experimented with variety of input resolutions including `[16, 256, 256]`, `[3
 ```
 
 Since the `mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres` model performed the best, I decided to use that as the 1st stage model for the 08-13 experiments that I ultimately used for the 2nd and 3rd validation set submissions.
-**Loss curves
+
+
+#### Loss Curves
 mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres
 ![image](https://github.com/user-attachments/assets/f1c2c53f-f98c-4153-8ee6-9c681720daab)
 mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_fullres
