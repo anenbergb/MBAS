@@ -18,9 +18,9 @@ MODEL=16_256_cascade_3d_low_res
 # nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS --c
 # nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
 
-MODEL=16_256_dil1_cascade_3d_low_res
-nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
-nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
+# MODEL=16_256_dil1_cascade_3d_low_res
+# nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
+# nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
 
 # python mbas/tasks/prepare_cascade_model_from_gt.py \
 # --plans $nnUNet_preprocessed/Dataset101_MBAS/MedNeXtV2Plans_2024_08_13_GT.json \
@@ -29,11 +29,12 @@ nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --dis
 # --trainer mbasTrainer \
 # --save-ground-truth
 
-PLANS=MedNeXtV2Plans_2024_08_13_GT
-MODEL=16_256_nblocks2_cascade_GT
-nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
-nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
+# MODEL=16_256_mask_dil1_cascade_GT
+# nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
+# nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
 
-MODEL=16_256_mask_dil1_cascade_GT
+TRAINER=mbasTrainer
+PLANS=nnUNetResEncUNetMPlans_2024_08_13
+MODEL=16_256
 nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
 nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling

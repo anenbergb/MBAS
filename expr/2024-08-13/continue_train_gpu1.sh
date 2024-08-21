@@ -21,11 +21,19 @@ export nnUNet_results="/home/bryan/expr/mbas_nnUNet_results"
 # --trainer mbasTrainer \
 # --use-crossval-postprocessed
 
+# TRAINER=mbasTrainer
+# PLANS=MedNeXtV2Plans_2024_08_13
+# MODEL=16_256_nblocks2_cascade_3d_low_res
+# nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
+
 TRAINER=mbasTrainer
-PLANS=MedNeXtV2Plans_2024_08_13
-MODEL=16_256_nblocks2_cascade_3d_low_res
-nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
+PLANS=MedNeXtV2Plans_2024_08_13_GT
+MODEL=16_256_nblocks2_cascade_GT
+# nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
+# nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
+
 
 # Probably should train this same model on the GT data as well?
 MODEL=16_256_mask_dil1_cascade_3d_low_res
 nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS
+nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
