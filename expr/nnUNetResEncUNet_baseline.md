@@ -3,6 +3,8 @@ I trained the baseline nnUNetResEncUNet style models.
 * Training for 1000 epochs is better than training for 250 epochs. 
 * 3D models are better than 2D models
 * L model is marginally better than M model.
+
+
 L model definition
 ```
 "patch_size": [32, 384, 384]

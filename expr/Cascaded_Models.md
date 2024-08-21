@@ -75,8 +75,8 @@ The 2nd stage models trained on the dilated ground truth masks performed worse t
 ### Cascaded 1st stage models
 The objective of the 1st stage model is to perform binary segmentation of left and right atrium -- i.e the goal is to segment the foreground (heart atrium) from the background. The ground truth 3-class segmentation masks were binarized and used as labels.
 
-I trained a variety of `nnUNetResEncUNetM` models. I experimented with different input resolutions and spacings. The default spacing for the MBAS dataset is `[2.5, 1.5, 1.5]` with MRI volume size of either `[44,638,638]` or `[44,574,574]`. The MRI volumes were downsampled to "3d_lowres" `[2.5, 0.9737296353754783, 0.9737296353754783]` spacing with volume size `[2.5, 410, 410]`, "3d_lowres_1.0" '[2.5, 1.0, 1.0]` spacing with volume size `[44, 399, 399]`, "3d_lowres_1.25" `[2.5, 1.25, 1.25]` spacing with volume size `[ 44, 319, 319]`, and "3d_lowres_1.5" `[2.5, 1.5, 1.5]` spacing with volume size `[ 44, 266, 266]`.
-I experimented with variety of input resolutions including `[16, 256, 256]`, [32, 256, 256]`, `[40, 256, 256]`, `[20, 256, 256]` for the default "3d_fullres" model, and `[28, 256, 224]` for the default 3d_lowres model. `nblocks3` refers to the number of ResidualBlocks in the first stage of the Residual Encoder.
+I trained a variety of `nnUNetResEncUNetM` models. I experimented with different input resolutions and spacings. The default spacing for the MBAS dataset is `[2.5, 1.5, 1.5]` with MRI volume size of either `[44,638,638]` or `[44,574,574]`. The MRI volumes were downsampled to "3d_lowres" `[2.5, 0.9737296353754783, 0.9737296353754783]` spacing with volume size `[2.5, 410, 410]`, "3d_lowres_1.0" `[2.5, 1.0, 1.0]` spacing with volume size `[44, 399, 399]`, "3d_lowres_1.25" `[2.5, 1.25, 1.25]` spacing with volume size `[ 44, 319, 319]`, and "3d_lowres_1.5" `[2.5, 1.5, 1.5]` spacing with volume size `[ 44, 266, 266]`.
+I experimented with variety of input resolutions including `[16, 256, 256]`, `[32, 256, 256]`, `[40, 256, 256]`, `[20, 256, 256]` for the default "3d_fullres" model, and `[28, 256, 224]` for the default 3d_lowres model. `nblocks3` refers to the number of ResidualBlocks in the first stage of the Residual Encoder.
 ```
 |    | model                                                                        |   Rank |   Avg_Rank |   DSC_atrium |   HD95_atrium |
 |----|------------------------------------------------------------------------------|--------|------------|--------------|---------------|
@@ -93,14 +93,7 @@ I experimented with variety of input resolutions including `[16, 256, 256]`, [32
 |  8 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_32_256             |     11 |       11   |     0.472544 |     137.721   |
 ```
 
-## Adding dilation
-
-
-
-
-
-Dataset101_MBAS/mbasTrainer__MedNeXtV2Plans_2024_08_13__16_256_nblocks2_cascade_3d_low_res
-- overfitting to the training data. validation loss diverged.
+Since the `mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres` model performed the best, I decided to use that as the 1st stage model for the 08-13 experiments that I ultimately used for the 2nd and 3rd validation set submissions.
 
 
 
