@@ -64,7 +64,7 @@ class MBASTrainerConfigurator:
         boundary_loss_alpha_max=0.25,
         alpha_stepwise_warmup_scaled=True,
         probabilistic_oversampling=False,
-        oversample_foreground_percent=1.0,
+        oversample_foreground_percent=0.0,
         sample_class_probabilities={1: 0.5, 2: 0.25, 3: 0.25},
         batch_dice=False,
     ):
@@ -119,6 +119,72 @@ class MBASTrainerConfigurator:
         self.current_configuration["is_cascaded_mask"] = is_cascaded_mask
         self.current_configuration["previous_stage"] = previous_stage
         return self
+
+    def MedNeXtV1(
+        self,
+        features_per_stage=(32, 64, 128, 256, 320, 320, 320),
+        stem_kernel_size=(1, 1, 1),
+        kernel_sizes=[
+            [1, 3, 3],
+            [1, 3, 3],
+            [3, 3, 3],
+            [3, 3, 3],
+            [3, 3, 3],
+            [3, 3, 3],
+            [3, 3, 3],
+        ],
+        strides=[
+            [1, 1, 1],
+            [1, 2, 2],
+            [1, 2, 2],
+            [2, 2, 2],
+            [2, 2, 2],
+            [2, 2, 2],
+            [2, 2, 2],
+        ],
+        n_blocks_per_stage=[1, 3, 4, 6, 6, 6, 6],
+        exp_ratio_per_stage=[2, 3, 4, 4, 4, 4, 4],
+        n_blocks_per_stage_decoder=None,
+        exp_ratio_per_stage_decoder=None,
+        norm_type="group",
+        enable_affine_transform=False,
+        decode_stem_kernel_size=3,
+        override_down_kernel_size=False,
+        down_kernel_size=1,
+    ):
+        args_dict = locals()
+
+        n_stages = len(features_per_stage)
+        arch = {
+            "network_class_name": "mbas.architectures.MedNeXt.MedNeXt",
+            "_kw_requires_import": ["conv_op"],
+            "arch_kwargs": {
+                "conv_op": "torch.nn.modules.conv.Conv3d",
+                "n_stages": n_stages,
+            },
+        }
+
+        assert len(kernel_sizes) == n_stages
+        assert len(strides) == n_stages
+        assert len(n_blocks_per_stage) == n_stages
+        assert len(exp_ratio_per_stage) == n_stages
+        if n_blocks_per_stage_decoder is None:
+            args_dict["n_blocks_per_stage_decoder"] = n_blocks_per_stage[:-1][::-1] + [
+                n_blocks_per_stage[0]
+            ]
+        assert len(args_dict["n_blocks_per_stage_decoder"]) == n_stages
+        if exp_ratio_per_stage_decoder is None:
+            args_dict["exp_ratio_per_stage_decoder"] = exp_ratio_per_stage[:-1][
+                ::-1
+            ] + [exp_ratio_per_stage[0]]
+        assert len(args_dict["exp_ratio_per_stage_decoder"]) == n_stages
+
+        for k, v in args_dict.items():
+            if k != "self":
+                arch["arch_kwargs"][k] = v
+
+        self.current_configuration["architecture"] = arch
+        return self.current_configuration
 
     def MedNeXtV2(
         self,
