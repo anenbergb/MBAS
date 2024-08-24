@@ -5,6 +5,13 @@ A: 3D prediction\
 B: 3D ground truth\
 $$DICE(A,B) = \frac{2|A\cap B|}{|A| + |B|}$$
 
+## Overlap Score
+A: 3D prediction\
+B: 3D ground truth\
+$$OVERLAP(A,B) = \frac{|A\cap B|}{|B|}$$
+
+Overlap score won't penalized false positive predictions, whereas Dice Score will.
+
 ## IoU (Jaccard Index)
 $$IoU(A,B) = \frac{|A\cap B|}{|A\cup B|}$$
 
@@ -44,3 +51,16 @@ LA diameter and volume are the two widely used clinical measures during the clin
 
 ### Error of the 3D LA volume between predictions and ground truth
 * The LA volume, measured in $cm^3$, is calculated by summing the total number of positive (LA cavity) pixels.
+
+## SurfaceDistanceMetric
+https://docs.monai.io/en/stable/metrics.html#monai.metrics.SurfaceDiceMetric
+Reference
+* https://arxiv.org/pdf/2111.05408
+
+normalized surface dice (NSD) (Nikolov et al., 2021) estimates which fraction of a segmentation boundary is correctly predicted with an additional threshold τ related to the clinically
+acceptable amount of deviation in pixels. It is thus a measure of what fraction of a segmentation boundary would have to be
+redrawn to correct for segmentation errors. 
+Instead of one common threshold τ, we used a class-specific threshold τo for each organ class o since the difficulty of annotating varies between organs 
+(e.g. an organ with a clear boundary, such as liver, is easier to precisely annotate than an organ with a fuzzy boundary, such as omentum).
+
+This metric determines which fraction of a segmentation boundary is correctly predicted. A boundary element is considered correctly predicted if the closest distance to the reference boundary is smaller than or equal to the specified threshold related to the acceptable amount of deviation in pixels. The NSD is bounded between 0 and 1.
