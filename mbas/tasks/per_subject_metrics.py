@@ -11,11 +11,12 @@ import pandas as pd
 import torchio as tio
 from tabulate import tabulate
 
-from monai.metrics import HausdorffDistanceMetric, DiceMetric
+from monai.metrics import HausdorffDistanceMetric, DiceMetric, SurfaceDiceMetric
 from monai.transforms import AsDiscrete, Compose
 from mbas.data.nifti import make_subject, get_subject_folders
 from mbas.data.constants import MBAS_SHORT_LABELS
 from mbas.data.nifti import load_subjects
+from mbas.utils.mean_overlap import MeanOverlap
 
 
 def compute_per_subject_metrics(
@@ -30,6 +31,18 @@ def compute_per_subject_metrics(
     hausdorff_metric = HausdorffDistanceMetric(
         include_background=False, percentile=95.0, directed=False
     )
+    class_thresholds = [5] * len(label_dict)
+    # acceptable amount of deviation in pixels. 5 pixels.
+    surface_dice_metric = SurfaceDiceMetric(
+        class_thresholds=class_thresholds,
+        include_background=False,
+        distance_metric="euclidean",
+        reduction="mean",
+        get_not_nans=False,
+        use_subvoxels=False,
+    )
+    overlap_metric = MeanOverlap(include_background=False, reduction="mean")
+
     to_onehot = Compose([AsDiscrete(to_onehot=len(label_dict)), lambda x: x[None]])
 
     metrics_dict = []
@@ -42,9 +55,12 @@ def compute_per_subject_metrics(
         predictions_onehot = to_onehot(subject.predictions.data)
         dice_score = dice_metric(y_pred=predictions_onehot, y=label_onehot)
         hausdorff_distance = hausdorff_metric(y_pred=predictions_onehot, y=label_onehot)
+        overlap_score = overlap_metric(y_pred=predictions_onehot, y=label_onehot)
+        # surface_dice_score = surface_dice_metric(y_pred=predictions_onehot, y=label_onehot)
 
         dice123 = dice_score.flatten().tolist()
         h123 = hausdorff_distance.flatten().tolist()
+        overlap123 = overlap_score.flatten().tolist()
 
         mdict = {
             "subject": subject.patient_id_str,
@@ -54,6 +70,8 @@ def compute_per_subject_metrics(
             mdict[f"DSC_{label_dict[i+1]}"] = dice
         for i, haus in enumerate(h123):
             mdict[f"HD95_{label_dict[i+1]}"] = haus
+        for i, overlap in enumerate(overlap123):
+            mdict[f"OVERLAP_{label_dict[i+1]}"] = overlap
         metrics_dict.append(mdict)
     df = pd.DataFrame.from_records(metrics_dict)
     logger.info(
@@ -64,7 +82,9 @@ def compute_per_subject_metrics(
 
 def make_average_table(df):
     metric_columns = [
-        x for x in df.columns if x.startswith("DSC") or x.startswith("HD95")
+        x
+        for x in df.columns
+        if x.startswith("DSC") or x.startswith("HD95") or x.startswith("OVERLAP")
     ]
     avg_df = pd.DataFrame(
         {

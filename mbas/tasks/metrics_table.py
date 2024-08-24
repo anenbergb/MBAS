@@ -33,6 +33,7 @@ COLUMN_ORDERS = [
     "DSC_left",
     "HD95_left",
     "DSC_atrium",
+    "OVERLAP_atrium",
     "HD95_atrium",
 ]
 
