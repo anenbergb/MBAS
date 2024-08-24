@@ -270,6 +270,8 @@ class MBASTrainerConfigurator:
         ],
         n_blocks_per_stage=[1, 3, 4, 6, 6, 6],
         n_conv_per_stage_decoder=[1, 1, 1, 1, 1],
+        dropout_op=None,
+        dropout_op_kwargs=None,
     ):
         args_dict = locals()
 
