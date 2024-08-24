@@ -119,12 +119,14 @@ def df_filter_reindex(df):
     return df.reindex(columns=column_orders)
 
 
-def compute_per_model_ranks(df):
+def compute_per_model_ranks(df, metrics_to_rank=["DSC", "HD"]):
     metric_rank_list = [
         df["model"],
-        *add_metric_ranks(df, "DSC", False),
-        *add_metric_ranks(df, "HD", True),
     ]
+    for metric_to_rank in metrics_to_rank:
+        ascending = True if metric_to_rank == "HD" else False
+        metric_rank_list += [*add_metric_ranks(df, metric_to_rank, ascending)]
+
     metric_rank_df = pd.concat(metric_rank_list, axis=1)
     # Identify columns that start with "DSC" or "HD"
     columns_of_interest = [
@@ -172,6 +174,7 @@ def metrics_table(
     cache_filepath: str | None = None,
     save_filepath: str | None = None,
     label_key: str = "label",
+    metrics_to_rank: List[str] = ["DSC", "HD"],
 ):
     subjects = load_subjects(dataset_dir, add_binary=label_key == "binary_label")
     logger.info(f"Loaded { len(subjects)} subjects")
@@ -210,7 +213,9 @@ def metrics_table(
         ).reset_index(drop=True)
 
     logger.info(f"Computing ranks for {len(per_model_metrics_df)} models")
-    per_model_ranks_df = compute_per_model_ranks(per_model_metrics_df)
+    per_model_ranks_df = compute_per_model_ranks(
+        per_model_metrics_df, metrics_to_rank=metrics_to_rank
+    )
     per_model_metrics_df = add_avg_rank(per_model_metrics_df, per_model_ranks_df)
     per_model_std_df = add_avg_rank(per_model_std_df, per_model_ranks_df)
 
@@ -267,6 +272,12 @@ Compute Dice score and Hausdorff distance across all experiments.
         default="label",
         type=str,
     )
+    parser.add_argument(
+        "--metrics-to-rank",
+        type=str,
+        nargs="+",
+        default=["DSC", "HD"],
+    )
     return parser.parse_args()
 
 
@@ -280,5 +291,6 @@ if __name__ == "__main__":
             args.cache,
             args.save,
             args.label_key,
+            args.metrics_to_rank,
         )
     )
