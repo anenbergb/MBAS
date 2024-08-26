@@ -29,6 +29,8 @@ The slim_128 variant performed worse.
 With this model I oversampled the foreground 100% of the time for the first 430 epochs, and then randomly sample any patch.
 * mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96_foreground_every_other
 This model gaurentees that 50% of the minibatch is sampled from the foreground. This performs worse than the MedNeXtV2_3d_lowres_slim_96 model whidch randomly samples foreground 25% of the time.
+* MedNeXtV2_3d_lowres_foreground25
+Randomly samples foreground patch 25% of the time.
 ### Slim model size
 mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96 achieved better accuracy than MedNeXtV2_3d_lowres
 * However, MedNeXtV2_3d_lowres_slim_96 oversamples foreground 25% of the time whereas MedNeXtV2_3d_lowres randomly samples patches (0% oversample).
@@ -142,3 +144,16 @@ All of the models were trained with 25% probabilistic foreground oversampling.
 | 10 | mbasTrainer__plans_2024_08_23__MedNeXtV2_3d_lowres_p32_256_slim_96                        |     15 |       14   |     0.929065 |         0.928198 |       3.63267 |
 | 15 | mbasTrainer__plans_2024_08_23__MedNeXtV2_3d_lowres_p16_256_slim_96                        |     18 |       18.5 |     0.92886  |         0.923015 |       3.9424  |
 | 23 | mbasTrainer__plans_2024_08_23__MedNeXtV2_3d_lowres_p32_256_slim_96_k5_stem5               |     19 |       19.5 |     0.924232 |         0.923442 |       3.85475 |
+
+
+# 2024-08-24
+A few experiments with ResEncUNet_3d_lowres models
+|    | model                                                                                     |   Rank |   Avg_Rank |   DSC_atrium |   OVERLAP_atrium |   HD95_atrium |
+|----|-------------------------------------------------------------------------------------------|--------|------------|--------------|------------------|---------------|
+|  1 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres                                 |      1 |        2   |     0.934025 |         0.934561 |       3.39874 |
+| 25 | mbasTrainer__plans_2024_08_24__ResEncUNet_3d_lowres_for25                                 |      2 |        2.5 |     0.934184 |         0.935395 |       3.42663 |
+| 26 | mbasTrainer__plans_2024_08_24__ResEncUNet_3d_lowres_for25_drop50                          |     19 |       19.5 |     0.923642 |         0.957245 |       3.71879 |
+
+ResEncUNet_3d_lowres_k5_for25
+
+
