@@ -117,16 +117,11 @@ configurator.configurations["MedNeXtV1_3d_lowres_slim_96"] = configurator.set_pa
 
 # 2024-08-23
 ### Different patch sizes 
-* MedNeXtV2_3d_lowres_p32_256_slim_96
-* mbasTrainer__plans_2024_08_23__MedNeXtV2_3d_lowres_p16_256_slim_96
-### Larger filter sizes 5x5x5
-* MedNeXtV2_3d_lowres_p32_256_slim_96_stem5
-Oversample foreground 25%.
-`stem_kernel_size=(1,5,5)`. 
-* MedNeXtV2_3d_lowres_p32_256_slim_96_k5_stem5
-Oversample foreground 25%.
-`stem_kernel_size=(1,5,5)`.
-Add some 5x5 kernels
+The MedNeXtV2_3d_lowres_slim_96 model uses patch size `(28,256,224)`. 
+I experimented with differnet patch sizes such as (32,256,256) and (16,256,256).
+I also experimented with increasing the kernel size of the stem from (1,3,3) to (1,5,5).
+
+k5_stem5 adds 5x5 kernels instead of 3x3 kernels.
 ```
 kernel_sizes=[
     [1,5,5],
@@ -136,5 +131,14 @@ kernel_sizes=[
     [3,3,3],
     [3,3,3],
     [3,3,3]
-]
 ```
+It seems to be the case that the patch size (28,256,224) is the best, and that adding 5x5 kernels doesn't help.
+All of the models were trained with 25% probabilistic foreground oversampling.
+
+|    | model                                                                                     |   Rank |   Avg_Rank |   DSC_atrium |   OVERLAP_atrium |   HD95_atrium |
+|----|-------------------------------------------------------------------------------------------|--------|------------|--------------|------------------|---------------|
+|  6 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96                                |      7 |        8   |     0.931271 |         0.92968  |       3.52871 |
+| 24 | mbasTrainer__plans_2024_08_23__MedNeXtV2_3d_lowres_p32_256_slim_96_stem5                  |     12 |       12   |     0.929928 |         0.927175 |       3.55324 |
+| 10 | mbasTrainer__plans_2024_08_23__MedNeXtV2_3d_lowres_p32_256_slim_96                        |     15 |       14   |     0.929065 |         0.928198 |       3.63267 |
+| 15 | mbasTrainer__plans_2024_08_23__MedNeXtV2_3d_lowres_p16_256_slim_96                        |     18 |       18.5 |     0.92886  |         0.923015 |       3.9424  |
+| 23 | mbasTrainer__plans_2024_08_23__MedNeXtV2_3d_lowres_p32_256_slim_96_k5_stem5               |     19 |       19.5 |     0.924232 |         0.923442 |       3.85475 |
