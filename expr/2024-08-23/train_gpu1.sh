@@ -15,12 +15,23 @@ export nnUNet_results="/home/bryan/expr/mbas_nnUNet_results"
 TRAINER=mbasTrainer
 PLANS=plans_2024_08_23
 
-# MODEL=MedNeXtV2_3d_lowres_p16_256_slim_96
-# nnUNetv2_train 104 $MODEL 0 -tr $TRAINER -p $PLANS --c
-# nnUNetv2_find_best_configuration 104 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
+MODEL=MedNeXtV2_3d_lowres_p16_256_slim_96
+nnUNetv2_train 104 $MODEL 0 -tr $TRAINER -p $PLANS --c
+nnUNetv2_find_best_configuration 104 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
 
 MODEL=MedNeXtV2_3d_lowres_p32_256_slim_96_k5_stem5
 nnUNetv2_train 104 $MODEL 0 -tr $TRAINER -p $PLANS --c
 nnUNetv2_find_best_configuration 104 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
 
+PLANS=plans_2024_08_24
+MODEL=ResEncUNet_3d_lowres_for25_drop50
+nnUNetv2_train 104 $MODEL 0 -tr $TRAINER -p $PLANS --c
+nnUNetv2_find_best_configuration 104 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
+MODEL=ResEncUNet_3d_lowres_k5_for25
+nnUNetv2_train 104 $MODEL 0 -tr $TRAINER -p $PLANS --c
+nnUNetv2_find_best_configuration 104 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
 
+PLANS=plans_2024_08_21
+MODEL=MedNeXtV2_3d_lowres_foreground25
+nnUNetv2_train 104 $MODEL 0 -tr $TRAINER -p $PLANS --c
+nnUNetv2_find_best_configuration 104 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling

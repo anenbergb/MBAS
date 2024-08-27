@@ -119,6 +119,13 @@ def df_filter_reindex(df):
     return df.reindex(columns=column_orders)
 
 
+def col_starts_with(col, prefixes):
+    for prefix in prefixes:
+        if col.startswith(prefix):
+            return True
+    return False
+
+
 def compute_per_model_ranks(df, metrics_to_rank=["DSC", "HD"]):
     metric_rank_list = [
         df["model"],
@@ -129,10 +136,9 @@ def compute_per_model_ranks(df, metrics_to_rank=["DSC", "HD"]):
 
     metric_rank_df = pd.concat(metric_rank_list, axis=1)
     # Identify columns that start with "DSC" or "HD"
+
     columns_of_interest = [
-        col
-        for col in metric_rank_df.columns
-        if col.startswith("DSC") or col.startswith("HD")
+        col for col in metric_rank_df.columns if col_starts_with(col, metrics_to_rank)
     ]
     # Compute the average rank for each row
     metric_rank_df["Avg_Rank"] = metric_rank_df[columns_of_interest].mean(axis=1)
