@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.conv import _ConvNd
+from torch.nn.modules.dropout import _DropoutNd
 from typing import Union, Type, List, Tuple
 
 from dynamic_network_architectures.building_blocks.helper import (
@@ -102,6 +103,8 @@ class MedNeXtBlock(nn.Module):
         enable_affine_transform: bool = False,
         enable_residual: bool = True,
         upsample: bool = False,
+        dropout_op: Union[None, Type[_DropoutNd]] = None,
+        dropout_op_kwargs: dict = None,
     ):
         super().__init__()
         """
@@ -124,6 +127,9 @@ class MedNeXtBlock(nn.Module):
             dilation=dilation,
             groups=self.n_groups,
         )
+        self.dropout = None
+        if dropout_op is not None:
+            self.dropout = dropout_op(**dropout_op_kwargs)
 
         # Normalization Layer. GroupNorm is used by default.
         # original MedNeXt implementation has num_groups=in_channels
@@ -229,6 +235,8 @@ class MedNeXtBlock(nn.Module):
 
     def forward(self, x):
         out = self.conv1(x)
+        if self.dropout is not None:
+            out = self.dropout(out)
         out = self.norm_conv2_act(out)
         if self.enable_affine_transform:
             out = self.apply_affine_transform(out)

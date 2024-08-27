@@ -3,10 +3,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn.modules.conv import _ConvNd
+from torch.nn.modules.dropout import _DropoutNd
 
 from dynamic_network_architectures.building_blocks.helper import (
     convert_conv_op_to_dim,
     maybe_convert_scalar_to_list,
+    get_matching_convtransp,
 )
 from dynamic_network_architectures.initialization.weight_init import InitWeights_He
 
@@ -24,6 +26,7 @@ class MedNeXtV2(nn.Module):
         stem_kernel_size: Union[int, List[int], Tuple[int, ...]] = [1, 3, 3],
         stem_channels: int | None = None,
         stem_dilation: Union[int, List[int], Tuple[int, ...]] = 1,
+        stem_type: str = "conv",  # or StackedConvBlocks
         kernel_sizes: Union[
             int, List[int], Tuple[int, ...], Tuple[Tuple[int, ...], ...]
         ] = [
@@ -54,6 +57,9 @@ class MedNeXtV2(nn.Module):
         norm_type: str = "group",
         enable_affine_transform: bool = False,
         decoder_cat_skip: bool = False,
+        decoder_conv_trans_up: bool = False,
+        dropout_op: Union[None, Type[_DropoutNd]] = None,
+        dropout_op_kwargs: dict = None,
     ):
         """
 
@@ -87,6 +93,9 @@ class MedNeXtV2(nn.Module):
             stem_kernel_size=stem_kernel_size,
             stem_channels=stem_channels,
             stem_dilation=stem_dilation,
+            stem_type=stem_type,
+            dropout_op=dropout_op,
+            dropout_op_kwargs=dropout_op_kwargs,
         )
         self.decoder = MedNeXtDecoder(
             encoder=self.encoder,
@@ -95,6 +104,9 @@ class MedNeXtV2(nn.Module):
             exp_ratio_per_stage=exp_ratio_per_stage_decoder,
             deep_supervision=deep_supervision,
             cat_skip=decoder_cat_skip,
+            conv_trans_up=decoder_conv_trans_up,
+            dropout_op=dropout_op,
+            dropout_op_kwargs=dropout_op_kwargs,
         )
         # Used to fix PyTorch checkpointing bug
         # self.dummy_tensor = nn.Parameter(torch.tensor([1.0]), requires_grad=True)
@@ -134,7 +146,10 @@ class MedNeXtEncoder(nn.Module):
         exp_ratio_per_stage: List[int],
         return_skips: bool = False,
         norm_type: str = "group",
+        dropout_op: Union[None, Type[_DropoutNd]] = None,
+        dropout_op_kwargs: dict = None,
         enable_affine_transform: bool = False,
+        stem_type: str = "conv",  # or StackedConvBlocks
         stem_kernel_size: Union[int, List[int], Tuple[int, ...]] = 1,
         stem_channels: int | None = None,
         stem_dilation: Union[int, List[int], Tuple[int, ...]] = 1,
@@ -179,18 +194,41 @@ class MedNeXtEncoder(nn.Module):
             len(dilation_per_stage) == n_stages
         ), "dilations_per_stage must have as many entries as we have resolution stages (n_stages)"
 
-        self.stem = Stem(
-            in_channels=input_channels,
-            out_channels=(
-                features_per_stage[0] if stem_channels is None else stem_channels
-            ),
-            conv_op=conv_op,
-            kernel_size=stem_kernel_size,
-            stride=1,
-            padding=None,
-            dilation=stem_dilation,
-            norm_type=norm_type,
-        )
+        if stem_type == "conv":
+            self.stem = Stem(
+                in_channels=input_channels,
+                out_channels=(
+                    features_per_stage[0] if stem_channels is None else stem_channels
+                ),
+                conv_op=conv_op,
+                kernel_size=stem_kernel_size,
+                stride=1,
+                padding=None,
+                dilation=stem_dilation,
+                norm_type=norm_type,
+            )
+        elif stem_type == "StackedConvBlocks":
+            norm_op = torch.nn.modules.instancenorm.InstanceNorm3d
+            norm_op_kwargs = {"eps": 1e-05, "affine": True}
+            nonlin = torch.nn.LeakyReLU
+            nonlin_kwargs = {"inplace": True}
+            self.stem = StackedConvBlocks(
+                num_convs=1,
+                conv_op=conv_op,
+                input_channels=(
+                    features_per_stage[0] if stem_channels is None else stem_channels
+                ),
+                kernel_size=kernel_sizes[0],
+                initial_stride=1,
+                conv_bias=True,
+                norm_op=norm_op,
+                norm_op_kwargs=norm_op_kwargs,
+                dropout_op=dropout_op,
+                dropout_op_kwargs=dropout_op_kwargs,
+                nonlin=nonlin,
+                nonlin_kwargs=nonlin_kwargs,
+            )
+
         input_channels = (
             features_per_stage[0] if stem_channels is None else stem_channels
         )
@@ -212,6 +250,8 @@ class MedNeXtEncoder(nn.Module):
                         dilation=dilation_per_stage[i],
                         norm_type=norm_type,
                         enable_affine_transform=enable_affine_transform,
+                        dropout_op=dropout_op,
+                        dropout_op_kwargs=dropout_op_kwargs,
                     )
                     for bi in range(n_blocks_per_stage[i])
                 ]
@@ -262,6 +302,9 @@ class MedNeXtDecoder(nn.Module):
         exp_ratio_per_stage: List[int],
         deep_supervision: bool = True,
         cat_skip: bool = False,
+        conv_trans_up: bool = False,
+        dropout_op: Union[None, Type[_DropoutNd]] = None,
+        dropout_op_kwargs: dict = None,
     ):
         """
         This class needs the skips of the encoder as input in its forward.
@@ -291,6 +334,14 @@ class MedNeXtDecoder(nn.Module):
         conv_op = encoder.conv_op
         norm_type = encoder.norm_type
         enable_affine_transform = encoder.enable_affine_transform
+        dropout_op = encoder.dropout_op if dropout_op is None else dropout_op
+        dropout_op_kwargs = (
+            encoder.dropout_op_kwargs
+            if dropout_op_kwargs is None
+            else dropout_op_kwargs
+        )
+
+        transpconv_op = get_matching_convtransp(conv_op=conv_op)
 
         self.stages = nn.ModuleList()
         self.up_blocks = nn.ModuleList()
@@ -300,19 +351,32 @@ class MedNeXtDecoder(nn.Module):
             input_features_below = encoder.output_channels[-s]
             input_features_skip = encoder.output_channels[-(s + 1)]
 
-            self.up_blocks.append(
-                MedNeXtBlock(
-                    in_channels=input_features_below,
-                    out_channels=input_features_skip,
-                    conv_op=conv_op,
-                    exp_ratio=exp_ratio_per_stage[s - 1],
-                    kernel_size=encoder.kernel_sizes[-s],
-                    stride=encoder.strides[-s],
-                    norm_type=norm_type,
-                    enable_affine_transform=enable_affine_transform,
-                    upsample=True,
+            if conv_trans_up:
+                self.up_blocks.append(
+                    transpconv_op(
+                        in_channels=input_features_below,
+                        out_channels=input_features_skip,
+                        kernel_size=encoder.kernel_sizes[-s],
+                        stride=encoder.strides[-s],
+                        # Hardcoding this to True because it's True for the ResidualEncoderUNet models
+                        bias=True,
+                    )
                 )
-            )
+            else:
+                self.up_blocks.append(
+                    MedNeXtBlock(
+                        in_channels=input_features_below,
+                        out_channels=input_features_skip,
+                        conv_op=conv_op,
+                        exp_ratio=exp_ratio_per_stage[s - 1],
+                        kernel_size=encoder.kernel_sizes[-s],
+                        stride=encoder.strides[-s],
+                        norm_type=norm_type,
+                        enable_affine_transform=enable_affine_transform,
+                        upsample=True,
+                    )
+                )
+
             stage = nn.Sequential(
                 *[
                     MedNeXtBlock(
@@ -328,6 +392,8 @@ class MedNeXtDecoder(nn.Module):
                         stride=1,
                         norm_type=norm_type,
                         enable_affine_transform=enable_affine_transform,
+                        dropout_op=dropout_op,
+                        dropout_op_kwargs=dropout_op_kwargs,
                     )
                     for bi in range(n_blocks_per_stage[s - 1])
                 ]

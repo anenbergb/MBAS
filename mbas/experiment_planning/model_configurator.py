@@ -192,6 +192,7 @@ class MBASTrainerConfigurator:
         stem_kernel_size=(1, 3, 3),
         stem_channels=None,
         stem_dilation=1,
+        stem_type: str = "conv",
         kernel_sizes=[
             [1, 3, 3],
             [1, 3, 3],
@@ -218,13 +219,16 @@ class MBASTrainerConfigurator:
         norm_type="group",
         enable_affine_transform=False,
         decoder_cat_skip=False,
+        decoder_conv_trans_up=False,
+        dropout_op=None,
+        dropout_op_kwargs=None,
     ):
         args_dict = locals()
 
         n_stages = len(features_per_stage)
         arch = {
             "network_class_name": "mbas.architectures.MedNeXtV2.MedNeXtV2",
-            "_kw_requires_import": ["conv_op"],
+            "_kw_requires_import": ["conv_op", "dropout_op"],
             "arch_kwargs": {
                 "conv_op": "torch.nn.modules.conv.Conv3d",
                 "n_stages": n_stages,
