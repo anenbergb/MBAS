@@ -5,18 +5,20 @@ I also want to increase the recall of the 1st stage model. It is better for the 
 
 In this case, the metric we might want to consider is overlap rather than DICE.
 
-|    | model                                                                                     |   Rank |   Avg_Rank |   DSC_atrium |   HD95_atrium |
-|----|-------------------------------------------------------------------------------------------|--------|------------|--------------|---------------|
-|  0 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres                                 |      1 |        1.5 |     0.934025 |       3.39874 |
-|  7 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96   (25% foreground)             |      8 |        8   |     0.931271 |       3.52871 |
-|  9 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres           (0% foreground)              |     10 |       10.5 |     0.931683 |       3.75624 |
-| 19 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96_foreground_every_other(50% for)|     12 |       11   |     0.930979 |       3.71367 |
-| 17 | mbasTrainer__plans_2024_08_21__MedNeXtV1_3d_lowres_slim_96   (25% foreground)             |     13 |       12.5 |     0.930228 |       3.72992 |
-| 11 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_128_foreground100_first_430epochs |     14 |       14   |     0.928902 |       3.77922 |
-| 12 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_super_slim_96  (25% foreground)        |     15 |       15.5 |     0.928146 |       4.08703 |
-| 18 | mbasTrainer__plans_2024_08_21__MedNeXtV1_3d_lowres_slim_96_override_down1                 |     16 |       15.5 |     0.927982 |       3.9724  |
-| 13 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_foreground100                          |     17 |       17   |     0.919785 |       5.3186  |
-| 14 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_128_foreground100                 |     18 |       18   |     0.908309 |       6.50415 |
+|    | model                                                                                     |   Rank |   Avg_Rank |   DSC_atrium |   OVERLAP_atrium |   HD95_atrium |
+|----|-------------------------------------------------------------------------------------------|--------|------------|--------------|------------------|---------------|
+|  7 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres                                 |      1 |        2   |     0.934025 |         0.934561 |       3.39874 |
+| 12 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96 (25% foreground)               |     10 |       11   |     0.931271 |         0.92968  |       3.52871 |
+| 17 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96_foreground0 (0% foreground)    |     15 |       15   |     0.931068 |         0.927779 |       3.65323 |
+| 19 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres (0% foreground)                        |     16 |       15.5 |     0.931683 |         0.927469 |       3.75624 |
+| 10 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96_foreground_every_other(50% for)|     17 |       16   |     0.930979 |         0.93047  |       3.71367 |
+| 28 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_128_foreground0 (0% foreground)   |     20 |       19.5 |     0.929109 |         0.925345 |       3.74357 |
+| 24 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_128_foreground100_first_430epochs |     21 |       21.5 |     0.928902 |         0.923285 |       3.77922 |
+| 21 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_super_slim_96 (25% foreground)         |     25 |       24.5 |     0.928146 |         0.925638 |       4.08703 |
+| 22 | mbasTrainer__plans_2024_08_21__MedNeXtV1_3d_lowres_slim_96_override_down1                 |     26 |       24.5 |     0.927982 |         0.924272 |       3.9724  |
+| 15 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_foreground100                          |     27 |       27   |     0.919785 |         0.928459 |       5.3186  |
+| 18 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_128_foreground100                 |     28 |       28   |     0.908309 |         0.927479 |       6.50415 |
+
 
 All variants of the MedNeXtV2 model scored lower than the `mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres`.
 ### Oversampling Foreground
@@ -24,17 +26,35 @@ Experimented with oversampling the foreground such that 100% of patches are cent
 * mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_foreground100
 * mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_128_foreground100
 Both of these models were the worst performing -- which implies that oversampling the foreground is not favorable for this task.
-The slim_128 variant performed worse.
-* mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_128_foreground100_first_430epochs
-With this model I oversampled the foreground 100% of the time for the first 430 epochs, and then randomly sample any patch.
-* mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96_foreground_every_other
-This model gaurentees that 50% of the minibatch is sampled from the foreground. This performs worse than the MedNeXtV2_3d_lowres_slim_96 model whidch randomly samples foreground 25% of the time.
-* MedNeXtV2_3d_lowres_foreground25
-Randomly samples foreground patch 25% of the time.
+
+### Increasing foreground oversampling from 0 -> 25 -> 100%
+The ordering of best models according to oversampling
+* 25%: mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96
+* 0 percent: mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96_foreground0
+* 50% (every other): mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96_foreground_every_other
+So the 25% oversampling foreground is better than 0%.
+The foreground every other model gaurentees that 50% of the minibatch is sampled from the foreground. This performs worse than the MedNeXtV2_3d_lowres_slim_96 model whidch randomly samples foreground 25% of the time.
+
+
+The ordering of best models according to oversampling
+* 0 percent: mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_128_foreground0
+* 100% for the first 430 epochs; mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_128_foreground100_first_430epochs
+* 100% mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_128_foreground100
+So 0% oversampling foreground is better than 100%.
+The foreground100_first_430 epochsmodel oversampled the foreground 100% of the time for the first 430 epochs, and then randomly sample any patch.
+
+The ordering of best models according to oversampling
+AWAITING RESULTS FOR MedNeXtV2_3d_lowres_foreground25, likely the best 
+* 0 percent: mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres (0% foreground)
+* 100%: mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_foreground100
+
+
 ### Slim model size
-mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96 achieved better accuracy than MedNeXtV2_3d_lowres
-* However, MedNeXtV2_3d_lowres_slim_96 oversamples foreground 25% of the time whereas MedNeXtV2_3d_lowres randomly samples patches (0% oversample).
-* TODO: train MedNeXtV2_3d_lowres_slim_96_random100 - randomly sample 100% of the time.
+* mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96_foreground0 achieved better accuracy than MedNeXtV2_3d_lowres (0% oversampling)
+AWAITING RESULTS:
+* mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96 (25% foreground) MAYBE achieves better accuracy than MedNeXtV2_3d_lowres_foreground25
+
+### Super Slim model dize
 mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_super_slim_96 performs worse than MedNeXtV2_3d_lowres_slim_96
 * slim_96 scores better than super_slim_96
 * Both of these models oversample foreground 25% of the time
@@ -43,16 +63,12 @@ mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_super_slim_96 performs worse 
 n_blocks_per_stage: [1,3,4,6,6,6] -> [1,1,1,1,1,1]
 exp_ratio_per_stage: [2,3,4,4,4,4] -> [1,1,1,1,1,1]
 ```
+
 ### MedNeXtV1
 MedNeXtV1 model variants performed worse than the corresponding MedNeXtV2 models
 * MedNeXtV1_3d_lowres_slim_96
 * MedNeXtV1_3d_lowres_slim_96_override_down1
 Also interesting that the overriding the downsample modules to use 1x1x1 kernels results in decreased performance.
-
-TODO:
-train MedNeXtV2_3d_lowres_slim_96_random100 - randomly sample 100% of the time.
-train MedNeXtV2_3d_lowres_slim_128_random100 randomly sample 100% of the time
-train MedNeXtV2_3d_lowres_foreground25 - oversample foreground 25% of the time
 
 ```
 configurator = MBASTrainerConfigurator(
@@ -152,8 +168,21 @@ A few experiments with ResEncUNet_3d_lowres models
 |----|-------------------------------------------------------------------------------------------|--------|------------|--------------|------------------|---------------|
 |  1 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres                                 |      1 |        2   |     0.934025 |         0.934561 |       3.39874 |
 | 25 | mbasTrainer__plans_2024_08_24__ResEncUNet_3d_lowres_for25                                 |      2 |        2.5 |     0.934184 |         0.935395 |       3.42663 |
-| 26 | mbasTrainer__plans_2024_08_24__ResEncUNet_3d_lowres_for25_drop50                          |     19 |       19.5 |     0.923642 |         0.957245 |       3.71879 |
+| 29 | mbasTrainer__plans_2024_08_24__ResEncUNet_3d_lowres_k5_for25                              |      6 |        7   |     0.932984 |         0.931738 |       3.47172 |
+|  1 | mbasTrainer__plans_2024_08_24__ResEncUNet_3d_lowres_for25_drop25                          |      8 |        8.5 |     0.931497 |         0.94638  |       3.46768 |
+|  0 | mbasTrainer__plans_2024_08_24__ResEncUNet_3d_lowres_for25_drop50                          |     22 |       22   |     0.923642 |         0.957245 |       3.71879 |
 
-ResEncUNet_3d_lowres_k5_for25
+ResEncUNet_3d_lowres_k5_for25 uses the same 5x5 kenrnels as in the MedNeXV2 experiments above
+* Adding 5x5 kernels yields slightly lower DSC, overlap, and HD95. 
+```
+kernel_sizes=[
+    [1, 5, 5],
+    [3, 5, 5],
+    [5, 5, 5],
+    [3, 3, 3],
+    [3, 3, 3],
+    [3, 3, 3],
+],
+```
 
 
