@@ -9,6 +9,7 @@ In this case, the metric we might want to consider is overlap rather than DICE.
 |----|-------------------------------------------------------------------------------------------|--------|------------|--------------|------------------|---------------|
 |  7 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres                                 |      1 |        2   |     0.934025 |         0.934561 |       3.39874 |
 | 12 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96 (25% foreground)               |     10 |       11   |     0.931271 |         0.92968  |       3.52871 |
+| 30 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_foreground25 (25% foreground           |     13 |       13   |     0.932545 |         0.930725 |       3.67657 |
 | 17 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96_foreground0 (0% foreground)    |     15 |       15   |     0.931068 |         0.927779 |       3.65323 |
 | 19 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres (0% foreground)                        |     16 |       15.5 |     0.931683 |         0.927469 |       3.75624 |
 | 10 | mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96_foreground_every_other(50% for)|     17 |       16   |     0.930979 |         0.93047  |       3.71367 |
@@ -44,15 +45,15 @@ So 0% oversampling foreground is better than 100%.
 The foreground100_first_430 epochsmodel oversampled the foreground 100% of the time for the first 430 epochs, and then randomly sample any patch.
 
 The ordering of best models according to oversampling
-AWAITING RESULTS FOR MedNeXtV2_3d_lowres_foreground25, likely the best 
+* 25%: mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_foreground25
 * 0 percent: mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres (0% foreground)
 * 100%: mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_foreground100
+So the 25% oversampling foreground is best.
 
 
 ### Slim model size
 * mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96_foreground0 achieved better accuracy than MedNeXtV2_3d_lowres (0% oversampling)
-AWAITING RESULTS:
-* mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96 (25% foreground) MAYBE achieves better accuracy than MedNeXtV2_3d_lowres_foreground25
+* mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_slim_96 (25% foreground) MAYBE achieves better accuracy than mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_foreground25
 
 ### Super Slim model dize
 mbasTrainer__plans_2024_08_21__MedNeXtV2_3d_lowres_super_slim_96 performs worse than MedNeXtV2_3d_lowres_slim_96
