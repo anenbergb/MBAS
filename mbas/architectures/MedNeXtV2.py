@@ -11,6 +11,9 @@ from dynamic_network_architectures.building_blocks.helper import (
     get_matching_convtransp,
 )
 from dynamic_network_architectures.initialization.weight_init import InitWeights_He
+from dynamic_network_architectures.building_blocks.simple_conv_blocks import (
+    StackedConvBlocks,
+)
 
 from mbas.architectures.blocks import *
 
@@ -215,7 +218,8 @@ class MedNeXtEncoder(nn.Module):
             self.stem = StackedConvBlocks(
                 num_convs=1,
                 conv_op=conv_op,
-                input_channels=(
+                input_channels=input_channels,
+                output_channels=(
                     features_per_stage[0] if stem_channels is None else stem_channels
                 ),
                 kernel_size=kernel_sizes[0],
@@ -228,6 +232,8 @@ class MedNeXtEncoder(nn.Module):
                 nonlin=nonlin,
                 nonlin_kwargs=nonlin_kwargs,
             )
+        else:
+            raise ValueError(f"Unknown stem type {stem_type}")
 
         input_channels = (
             features_per_stage[0] if stem_channels is None else stem_channels
@@ -341,8 +347,6 @@ class MedNeXtDecoder(nn.Module):
             else dropout_op_kwargs
         )
 
-        transpconv_op = get_matching_convtransp(conv_op=conv_op)
-
         self.stages = nn.ModuleList()
         self.up_blocks = nn.ModuleList()
         self.seg_layers = nn.ModuleList()
@@ -353,13 +357,12 @@ class MedNeXtDecoder(nn.Module):
 
             if conv_trans_up:
                 self.up_blocks.append(
-                    transpconv_op(
-                        in_channels=input_features_below,
-                        out_channels=input_features_skip,
-                        kernel_size=encoder.kernel_sizes[-s],
-                        stride=encoder.strides[-s],
-                        # Hardcoding this to True because it's True for the ResidualEncoderUNet models
-                        bias=True,
+                    make_transpose_block(
+                        input_features_below,
+                        input_features_skip,
+                        encoder.kernel_sizes[-s],
+                        encoder.strides[-s],
+                        conv_op,
                     )
                 )
             else:
