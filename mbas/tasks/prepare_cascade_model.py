@@ -25,19 +25,31 @@ def get_prev_stage_validation_predictions(
     Get the validation predictions from the previous stage.
     """
     predictions = []
-    for i in range(5):
-        if use_crossval_postprocessed:
-            fold_dir = os.path.join(
-                prev_stage, f"crossval_results_folds_{i}/postprocessed"
-            )
-        else:
-            fold_dir = os.path.join(prev_stage, f"fold_{i}/validation")
+
+    def add_predictions(fold_dir: str):
         if os.path.exists(fold_dir):
             for file in os.listdir(fold_dir):
                 if file.endswith(".nii.gz"):
                     predictions.append(os.path.join(fold_dir, file))
         else:
             logger.warning(f"Could not find {fold_dir}")
+
+    crossval_results_folds_0_1_2_3_4 = os.path.join(
+        prev_stage, "crossval_results_folds_0_1_2_3_4/postprocessed"
+    )
+    if use_crossval_postprocessed and os.path.exists(crossval_results_folds_0_1_2_3_4):
+        logger.info("Using crossval_results_folds_0_1_2_3_4")
+        add_predictions(crossval_results_folds_0_1_2_3_4)
+    else:
+        for i in range(5):
+            if use_crossval_postprocessed:
+                fold_dir = os.path.join(
+                    prev_stage, f"crossval_results_folds_{i}/postprocessed"
+                )
+            else:
+                fold_dir = os.path.join(prev_stage, f"fold_{i}/validation")
+            add_predictions(fold_dir)
+
     predictions = sorted(predictions)
     return predictions
 
