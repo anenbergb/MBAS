@@ -186,4 +186,40 @@ kernel_sizes=[
 ],
 ```
 
+# 2024-08-27
+The following experiments attempt to train a ResEncUNet_3d_lowres to achieve higher OVERLAP (i.e. recall). The idea is to reduce the number of parameters of the model and add dropout.
 
+ResEncUNet_3d_lowres_for25_drop50_slim128
+```
+features_per_stage=(32, 64, 128, 128, 128, 128),
+```
+ResEncUNet_3d_lowres_for25_drop50_slim96
+```
+features_per_stage=(32, 32, 64, 96, 96, 96),
+n_blocks_per_stage=[1, 3, 4, 6, 6, 6],
+```
+ResEncUNet_3d_lowres_for25_drop50_slim96_nblocks4
+```
+features_per_stage=(32, 32, 64, 96, 96, 96),
+n_blocks_per_stage=[1, 3, 4, 4, 4, 4],
+```
+
+When these models are ranked with respect to overlap they achieve higher overlap than the base model `ResEncUNet_3d_lowres_for25_drop50`.
+|    | model                                                                                        |   Rank |   Avg_Rank |   DSC_atrium |   OVERLAP_atrium |   HD95_atrium |
+|----|----------------------------------------------------------------------------------------------|--------|------------|--------------|------------------|---------------|
+| 12 | mbasTrainer__plans_2024_08_27__ResEncUNet_3d_lowres_for25_drop50_slim96                      |      1 |          1 |     0.917289 |         0.961467 |       4.07259 |
+| 15 | mbasTrainer__plans_2024_08_27__ResEncUNet_3d_lowres_for25_drop50_slim96_nblocks4             |      2 |          2 |     0.91771  |         0.961383 |       4.09641 |
+| 11 | mbasTrainer__plans_2024_08_27__ResEncUNet_3d_lowres_for25_drop50_slim128                     |      3 |          3 |     0.924305 |         0.958233 |       3.81758 |
+|  9 | mbasTrainer__plans_2024_08_24__ResEncUNet_3d_lowres_for25_drop50                             |      4 |          4 |     0.923642 |         0.957245 |       3.71879 |
+
+
+The other experiment that is run is to 
+MedNeXtV2_3d_lowres_for25_drop50
+- 50% dropout probability
+MedNeXtV2_3d_lowres_for25_drop25
+- 25% dropout probability
+MedNeXtV2_3d_lowres_for25_drop50_stemStacked
+- replace the basic conv stem with stemStacked, that also includes dropout, instance norm, and an activation function.
+MedNeXtV2_3d_lowres_for25_drop50_stemStacked_decoderConvTrans
+- also replace the upsampling MedNeXt blocks with simple ConvTranspose3d operations, which should reduce the number of parameters.
+MedNeXtV2_3d_lowres_for25_drop50_decoderConvTrans
