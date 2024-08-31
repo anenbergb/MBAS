@@ -186,4 +186,56 @@ kernel_sizes=[
 ],
 ```
 
+# 2024-08-27
+The following experiments attempt to train a ResEncUNet_3d_lowres to achieve higher OVERLAP (i.e. recall). The idea is to reduce the number of parameters of the model and add dropout.
 
+ResEncUNet_3d_lowres_for25_drop50_slim128
+```
+features_per_stage=(32, 64, 128, 128, 128, 128),
+```
+ResEncUNet_3d_lowres_for25_drop50_slim96
+```
+features_per_stage=(32, 32, 64, 96, 96, 96),
+n_blocks_per_stage=[1, 3, 4, 6, 6, 6],
+```
+ResEncUNet_3d_lowres_for25_drop50_slim96_nblocks4
+```
+features_per_stage=(32, 32, 64, 96, 96, 96),
+n_blocks_per_stage=[1, 3, 4, 4, 4, 4],
+```
+
+When these models are ranked with respect to overlap they achieve higher overlap than the base model `ResEncUNet_3d_lowres_for25_drop50`.
+|    | model                                                                                        |   Rank |   Avg_Rank |   DSC_atrium |   OVERLAP_atrium |   HD95_atrium |
+|----|----------------------------------------------------------------------------------------------|--------|------------|--------------|------------------|---------------|
+| 12 | mbasTrainer__plans_2024_08_27__ResEncUNet_3d_lowres_for25_drop50_slim96                      |      1 |          1 |     0.917289 |         0.961467 |       4.07259 |
+| 15 | mbasTrainer__plans_2024_08_27__ResEncUNet_3d_lowres_for25_drop50_slim96_nblocks4             |      2 |          2 |     0.91771  |         0.961383 |       4.09641 |
+| 11 | mbasTrainer__plans_2024_08_27__ResEncUNet_3d_lowres_for25_drop50_slim128                     |      3 |          3 |     0.924305 |         0.958233 |       3.81758 |
+|  9 | mbasTrainer__plans_2024_08_24__ResEncUNet_3d_lowres_for25_drop50                             |      4 |          4 |     0.923642 |         0.957245 |       3.71879 |
+
+
+The other experiment that were run include
+MedNeXtV2_3d_lowres_for25_drop50
+- 50% dropout probability
+MedNeXtV2_3d_lowres_for25_drop25
+- 25% dropout probability
+MedNeXtV2_3d_lowres_for25_drop50_stemStacked
+- replace the basic Stem (Conv + GroupNorm) with StackedConvBlocks, which includes dropout, instance norm, and a LeakyReLU nonlinearity function.
+MedNeXtV2_3d_lowres_for25_drop50_stemStacked_decoderConvTrans
+- In addiiton to replacing the Stem with StackedConvBlocks, also replaces the upsampling MedNeXt blocks with simple ConvTranspose3d operations, which should reduce the number of parameters.
+MedNeXtV2_3d_lowres_for25_drop50_decoderConvTrans
+- Only replaces the upsampling MedNeXt blocks with simple ConvTranspose3d operations.
+
+It appears that replacing the MedNeXt upsampling blocks with ConvTranspose3D blocks had the largest impact in increasing the Overlap (recall) but at significant cost to DICE score (accuracy). 
+
+
+|    | model                                                                                        |   Rank |   Avg_Rank |   DSC_atrium |   OVERLAP_atrium |   HD95_atrium |
+|----|----------------------------------------------------------------------------------------------|--------|------------|--------------|------------------|---------------|
+| 20 | mbasTrainer__plans_2024_08_27__MedNeXtV2_3d_lowres_for25_drop50_decoderConvTrans             |      5 |          5 |     0.899378 |         0.951496 |       8.45093 |
+| 24 | mbasTrainer__plans_2024_08_27__MedNeXtV2_3d_lowres_for25_drop50_stemStacked_decoderConvTrans |      7 |          7 |     0.879802 |         0.945808 |      14.8759  |
+| 27 | mbasTrainer__plans_2024_08_27__MedNeXtV2_3d_lowres_for25_drop25                              |     24 |         24 |     0.927263 |         0.928424 |       4.1716  |
+| 35 | mbasTrainer__plans_2024_08_27__MedNeXtV2_3d_lowres_for25_drop50                              |     36 |         36 |     0.919822 |         0.921    |       4.98324 |
+| 36 | mbasTrainer__plans_2024_08_27__MedNeXtV2_3d_lowres_for25_drop50_stemStacked                  |     37 |         37 |     0.894228 |         0.913912 |       8.22311 |
+
+
+# Conclusion
+The conclusion from this cohort of experiments is to train `mbasTrainer__plans_2024_08_27__ResEncUNet_3d_lowres_for25_drop50_slim96` for the Stage 1 binary segmentation model. I will also try to add additional postprocessing to the binary segmentation model results to further boost the Overlap (recall).
