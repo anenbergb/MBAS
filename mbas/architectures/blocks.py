@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.conv import _ConvNd
+from torch.nn.modules.dropout import _DropoutNd
 from typing import Union, Type, List, Tuple
 
 from dynamic_network_architectures.building_blocks.helper import (
@@ -20,6 +21,27 @@ def padding_from_kernel_dilation(
         dilation
     ), "Kernel size and dilation must have the same length!"
     return [d * (k - 1) // 2 for k, d in zip(kernel_size, dilation)]
+
+
+def compute_padding_from_stride(stride):
+    """
+    Useful for padding the tensors after ConvTranspose
+
+    stride is ordered as (D, H, W)
+    The padding 6-tuple should be ordered as
+    (padding_left, padding_right, padding_top, padding_bottom, padding_front, padding_back)
+
+    The output padded tensor is ordered as (D_out, H_out, W_out) where
+    D_out = padding_front + D + padding_out
+    H_out = padding_top + H + padding_bottom
+    W_out = padding_left + W + padding_right
+    """
+    padding = []
+    for s in stride[::-1]:
+        l_pad = (s - 1) // 2 + (s - 1) % 2
+        r_pad = (s - 1) // 2
+        padding.extend([l_pad, r_pad])
+    return padding
 
 
 class Stem(nn.Module):
@@ -102,6 +124,8 @@ class MedNeXtBlock(nn.Module):
         enable_affine_transform: bool = False,
         enable_residual: bool = True,
         upsample: bool = False,
+        dropout_op: Union[None, Type[_DropoutNd]] = None,
+        dropout_op_kwargs: dict = None,
     ):
         super().__init__()
         """
@@ -124,6 +148,9 @@ class MedNeXtBlock(nn.Module):
             dilation=dilation,
             groups=self.n_groups,
         )
+        self.dropout = None
+        if dropout_op is not None:
+            self.dropout = dropout_op(**dropout_op_kwargs)
 
         # Normalization Layer. GroupNorm is used by default.
         # original MedNeXt implementation has num_groups=in_channels
@@ -169,7 +196,7 @@ class MedNeXtBlock(nn.Module):
 
         self.zero_pad = None
         if upsample and np.prod(self.stride) > 1:
-            padding = self.compute_padding_from_stride(self.stride)
+            padding = compute_padding_from_stride(self.stride)
             if self.conv_dim == 3:
                 self.zero_pad = nn.ZeroPad3d(padding)
             elif self.conv_dim == 2:
@@ -207,28 +234,10 @@ class MedNeXtBlock(nn.Module):
         x = self.grn_gamma * (x * nx) + self.grn_beta + x
         return x
 
-    def compute_padding_from_stride(self, stride):
-        """
-        Useful for padding the tensors after ConvTranspose
-
-        stride is ordered as (D, H, W)
-        The padding 6-tuple should be ordered as
-        (padding_left, padding_right, padding_top, padding_bottom, padding_front, padding_back)
-
-        The output padded tensor is ordered as (D_out, H_out, W_out) where
-        D_out = padding_front + D + padding_out
-        H_out = padding_top + H + padding_bottom
-        W_out = padding_left + W + padding_right
-        """
-        padding = []
-        for s in stride[::-1]:
-            l_pad = (s - 1) // 2 + (s - 1) % 2
-            r_pad = (s - 1) // 2
-            padding.extend([l_pad, r_pad])
-        return padding
-
     def forward(self, x):
         out = self.conv1(x)
+        if self.dropout is not None:
+            out = self.dropout(out)
         out = self.norm_conv2_act(out)
         if self.enable_affine_transform:
             out = self.apply_affine_transform(out)
@@ -297,3 +306,37 @@ class LayerNorm(nn.Module):
             x = (x - u) / torch.sqrt(s + self.eps)
             x = self.weight[:, None, None, None] * x + self.bias[:, None, None, None]
             return x
+
+
+def make_transpose_block(
+    in_channels,
+    out_channels,
+    kernel_size,
+    stride,
+    conv_op=nn.Conv3d,
+):
+    transpconv_op = get_matching_convtransp(conv_op=conv_op)
+    # dilation always 1
+    dilation = maybe_convert_scalar_to_list(conv_op, 1)
+    conv_padding = padding_from_kernel_dilation(kernel_size, dilation)
+    post_padding = compute_padding_from_stride(stride)
+
+    conv_dim = convert_conv_op_to_dim(conv_op)
+    if conv_dim == 3:
+        zero_pad = nn.ZeroPad3d(post_padding)
+    elif conv_dim == 2:
+        zero_pad = nn.ZeroPad2d(post_padding)
+    else:
+        raise ValueError(f"Convolutional dimension {conv_dim} not supported!")
+
+    up_conv = transpconv_op(
+        in_channels=in_channels,
+        out_channels=out_channels,
+        kernel_size=kernel_size,
+        stride=stride,
+        padding=conv_padding,
+        dilation=1,
+        # Hardcoding this to True because it's True for the ResidualEncoderUNet models
+        bias=True,
+    )
+    return nn.Sequential(up_conv, zero_pad)
