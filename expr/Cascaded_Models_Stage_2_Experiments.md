@@ -43,18 +43,8 @@ configurator.configurations["ResEncUNet_p20_256_cascade_ResEncUNet_08_27"] = con
     n_conv_per_stage_decoder=[1, 1, 1, 1, 1, 1],
 )
 ```
-Also tried adding dilation to the first stage predictions `ResEncUNet_p20_256_dil1_cascade_ResEncUNet_08_27`
 
-```
-|    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
-|----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
-|  0 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_16_256_GT                                           |      1 |    1.33333 |   0.803356 |     2.47652 |   0.946645  |      2.24972 |   0.949421 |     2.60852 |
-|  8 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   11.3333  |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
-|  9 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05                                        |     10 |   12.3333  |   0.723894 |     2.84257 |   0.925716  |      3.03093 |   0.932273 |     3.93802 |
-| 10 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_13__16_256_dil1_cascade_3d_low_res                                |     11 |   14.6667  |   0.72286  |     2.85886 |   0.924629  |      3.26189 |   0.932176 |     3.65506 |
-| 66 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_cascade_ResEncUNet_08_27                               |     12 |   14.8333  |   0.723734 |     2.82654 |   0.924743  |      3.27531 |   0.931603 |     3.87116 |
-| 65 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_cascade_ResEncUNet_08_27                                    |     13 |   17       |   0.720656 |     2.88458 |   0.925382  |      3.20052 |   0.931084 |     3.87481 |
-```
+## Reference models
 As a reminder, the `mbasTrainer__nnUNetResEncUNetMPlans_2024_08_13__16_256_dil1_cascade_3d_low_res` model was the same exact architecture as `2024_08_30__ResEncUNet_p20_256_cascade_ResEncUNet_08_27`
 but with smaller input patch size of `(16,256,256)`.
 
@@ -92,3 +82,37 @@ oversample_foreground_percent=1.0,
 probabilistic_oversampling = True,
 sample_class_probabilities = {1: 0.5, 2: 0.25, 3: 0.25}
 ```
+
+## Experiment ideas
+### 1: Add dilation (buffer) to binary mask
+- adding dilation 1 to binary mask increased the accuracy
+
+|    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
+|----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
+|  8 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   11.6667  |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
+|  9 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05                                        |     10 |   12.6667  |   0.723894 |     2.84257 |   0.925716  |      3.03093 |   0.932273 |     3.93802 |
+| 68 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_cascade_ResEncUNet_08_27                               |     12 |   15.5     |   0.723734 |     2.82654 |   0.924743  |      3.27531 |   0.931603 |     3.87116 |
+| 67 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_cascade_ResEncUNet_08_27                                    |     14 |   17.8333  |   0.720656 |     2.88458 |   0.925382  |      3.20052 |   0.931084 |     3.87481 |
+
+### 2: Changing the patch size from (20,256,256) to smaller sizes
+- Reducing the patch size hurt performance
+- `p20_256` patch size (20,256,256) beats patch size (16,256,256), (16,192,192)
+
+|    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
+|----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
+|  8 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   11.6667  |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
+|  9 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05                                        |     10 |   12.6667  |   0.723894 |     2.84257 |   0.925716  |      3.03093 |   0.932273 |     3.93802 |
+| 68 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_cascade_ResEncUNet_08_27                               |     12 |   15.5     |   0.723734 |     2.82654 |   0.924743  |      3.27531 |   0.931603 |     3.87116 |
+| 65 | mbasTrainer__plans_2024_08_30__ResEncUNet_p16_192_dil1_cascade_ResEncUNet_08_27                               |     13 |   17.1667  |   0.722623 |     2.77173 |   0.924594  |      3.26591 |   0.93123  |     3.89253 |
+| 66 | mbasTrainer__plans_2024_08_30__ResEncUNet_p16_256_dil1_cascade_ResEncUNet_08_27                               |     16 |   18.3333  |   0.720092 |     2.85239 |   0.924964  |      3.20732 |   0.9311   |     3.94005 |
+
+### 3: Adding dropout
+- Adding dropout hurt performance
+|    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
+|----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
+|  8 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   11.6667  |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
+|  9 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05                                        |     10 |   12.6667  |   0.723894 |     2.84257 |   0.925716  |      3.03093 |   0.932273 |     3.93802 |
+| 68 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_cascade_ResEncUNet_08_27                               |     12 |   15.5     |   0.723734 |     2.82654 |   0.924743  |      3.27531 |   0.931603 |     3.87116 |
+| 69 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_drop50_cascade_ResEncUNet_08_27                        |     36 |   36       |   0.704776 |     2.89172 |   0.920088  |      3.32395 |   0.922068 |     4.18848 |
+
+### 4: Combining slim model (128 feature dim), with dropout, with varying patch size
