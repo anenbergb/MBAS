@@ -21,6 +21,7 @@ python mbas/tasks/per_subject_metrics.py \
 2024-09-02 01:39:33.617 | INFO     | __main__:compute_per_subject_metrics:77 - Computed per subject metrics for 70 / 100 subjects
 ```
 Default (without buffer)
+
 |                |   Average |       STD |
 |----------------|-----------|-----------|
 | DSC_atrium     |  0.916563 | 0.020782  |
@@ -28,6 +29,7 @@ Default (without buffer)
 | OVERLAP_atrium |  0.960739 | 0.0225544 |
 
 With ball dilation = 1
+
 |                |   Average |       STD |
 |----------------|-----------|-----------|
 | DSC_atrium     |  0.874342 | 0.0258963 |
@@ -35,11 +37,20 @@ With ball dilation = 1
 | OVERLAP_atrium |  0.980234 | 0.015214  |
 
 With ball dilation = 2
+
 |                |   Average |       STD |
 |----------------|-----------|-----------|
 | DSC_atrium     |  0.825065 | 0.029752  |
 | HD95_atrium    |  6.56993  | 1.86316   |
 | OVERLAP_atrium |  0.987674 | 0.0115984 |
+
+With ball dilation  = 2
+
+|                |   Average |        STD |
+|----------------|-----------|------------|
+| DSC_atrium     |  0.7723   | 0.0331598  |
+| HD95_atrium    |  7.98733  | 1.95485    |
+| OVERLAP_atrium |  0.992133 | 0.00926877 |
 
 Notice that the OVERLAP metric is increased
 
@@ -50,6 +61,7 @@ python mbas/tasks/per_subject_metrics.py \
 --use-binary-label-as-all-labels
 ```
 Default (without buffer)
+
 |               |   Average |       STD |
 |---------------|-----------|-----------|
 | DSC_wall      |  0.326928 | 0.0345789 |
@@ -63,6 +75,7 @@ Default (without buffer)
 | OVERLAP_left  |  **0.979436** | 0.0200462 |
 
 With ball dilation = 1
+
 |               |   Average |       STD |
 |---------------|-----------|-----------|
 | DSC_wall      |  0.311584 | 0.0328636 |
@@ -76,6 +89,7 @@ With ball dilation = 1
 | OVERLAP_left  |  **0.987365** | 0.0155187 |
 
 With ball dilation = 2
+
 |               |   Average |       STD |
 |---------------|-----------|-----------|
 | DSC_wall      |  0.287167 | 0.0302727 |
@@ -87,4 +101,19 @@ With ball dilation = 2
 | OVERLAP_wall  | ** 0.97642**  | 0.0195744 |
 | OVERLAP_right | ** 0.991443** | 0.0146745 |
 | OVERLAP_left  |  **0.991449** | 0.0134806 |
+
+With ball dilation = 3
+
+|               |   Average |       STD |
+|---------------|-----------|-----------|
+| DSC_wall      |  0.261594 | 0.0270484 |
+| DSC_right     |  0.375259 | 0.0545907 |
+| DSC_left      |  0.397722 | 0.0481255 |
+| HD95_wall     | 10.8188   | 1.82835   |
+| HD95_right    | 68.4535   | 9.68076   |
+| HD95_left     | 79.2885   | 9.68793   |
+| OVERLAP_wall  |  **0.985048** | 0.0156605 |
+| OVERLAP_right |  **0.99469**  | 0.0114553 |
+| OVERLAP_left  |  **0.994361** | 0.0117473 |
+
 Notice that the maximum overlap with wall increases from 90.95% to 96.09% to 97.6% with the added ball dilation. This will be the upper bound in possible DICE score.
