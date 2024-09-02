@@ -19,11 +19,18 @@ from mbas.data.nifti import load_subjects
 from mbas.utils.mean_overlap import MeanOverlap
 
 
+def copy_binary_label_to_all_labels(one_hot_label):
+    # assume one_hot_label is torch.Size([1, 4, 640, 640, 44])
+    one_hot_label[0, 2:] = one_hot_label[0, 1]
+    return one_hot_label
+
+
 def compute_per_subject_metrics(
     subjects: list[tio.Subject],
     results_dir: str,
     label_key: str = "label",
     label_dict: dict[int, str] = MBAS_SHORT_LABELS,
+    use_binary_label_as_all_labels: bool = False,
 ):
     dice_metric = DiceMetric(
         include_background=False, reduction="mean", get_not_nans=False
@@ -53,6 +60,8 @@ def compute_per_subject_metrics(
         subject.add_image(tio.LabelMap(path=results_file), "predictions")
         label_onehot = to_onehot(getattr(subject, label_key).data)
         predictions_onehot = to_onehot(subject.predictions.data)
+        if use_binary_label_as_all_labels:
+            predictions_onehot = copy_binary_label_to_all_labels(predictions_onehot)
         dice_score = dice_metric(y_pred=predictions_onehot, y=label_onehot)
         hausdorff_distance = hausdorff_metric(y_pred=predictions_onehot, y=label_onehot)
         overlap_score = overlap_metric(y_pred=predictions_onehot, y=label_onehot)
@@ -96,7 +105,11 @@ def make_average_table(df):
 
 
 def per_subject_metrics(
-    dataset_dir, results_dir, save_filepath: str | None = None, label_key: str = "label"
+    dataset_dir,
+    results_dir,
+    save_filepath: str | None = None,
+    label_key: str = "label",
+    use_binary_label_as_all_labels: bool = False,
 ):
     add_binary = label_key == "binary_label"
     if label_key == "label":
@@ -108,7 +121,11 @@ def per_subject_metrics(
     subjects = load_subjects(dataset_dir, add_binary=add_binary)
     logger.info(f"Loaded { len(subjects)} subjects")
     df = compute_per_subject_metrics(
-        subjects, results_dir, label_key=label_key, label_dict=label_dict
+        subjects,
+        results_dir,
+        label_key=label_key,
+        label_dict=label_dict,
+        use_binary_label_as_all_labels=use_binary_label_as_all_labels,
     )
     if save_filepath is not None:
         os.makedirs(os.path.dirname(save_filepath), exist_ok=True)
@@ -144,6 +161,11 @@ Compute Dice score and Hausdorff distance per subject.
         default="label",
         type=str,
     )
+    parser.add_argument(
+        "--use-binary-label-as-all-labels",
+        action="store_true",
+        default=False,
+    )
     return parser.parse_args()
 
 
@@ -151,6 +173,10 @@ if __name__ == "__main__":
     args = get_args()
     sys.exit(
         per_subject_metrics(
-            args.dataset_dir, args.results_dir, args.save, args.label_key
+            args.dataset_dir,
+            args.results_dir,
+            args.save,
+            args.label_key,
+            args.use_binary_label_as_all_labels,
         )
     )

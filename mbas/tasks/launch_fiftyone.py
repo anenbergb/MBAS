@@ -51,6 +51,14 @@ def make_color_scheme(predictions_name="predictions"):
                     {"intTarget": 3, "color": "#FF8000"},  # orange
                 ],
             },
+            {
+                "path": "frames.binary_mask",
+                "fieldColor": "#FFFFFF",
+                "colorByAttribute": "value",
+                "maskTargetsColors": [
+                    {"intTarget": 1, "color": "#FFFFFF"},  # white
+                ],
+            },
         ],
     )
 
@@ -141,7 +149,6 @@ def add_predictions_to_samples(
         predictions_file = os.path.join(predictions_dir, f"{patient_id_str}.nii.gz")
         if os.path.exists(predictions_file):
             add_segmentation_to_sample(sample, predictions_file, predictions_name)
-
     return samples
 
 
@@ -150,6 +157,7 @@ def launch_fiftyone(
     dataset_name,
     predictions_dir=[],
     predictions_name=None,
+    binary_mask_dir=None,
     port=5151,
 ):
     train_folders = sorted(get_subject_folders(os.path.join(data_dir, "Training")))
@@ -158,10 +166,18 @@ def launch_fiftyone(
     samples += create_samples(val_folders, "validation")
     for p_dir in predictions_dir:
         samples = add_predictions_to_samples(samples, p_dir, predictions_name)
+    for b_dir in binary_mask_dir:
+        samples = add_predictions_to_samples(samples, b_dir, "binary_mask")
 
     # samples = samples[:5]
     dataset = fo.Dataset(dataset_name)
-    dataset.default_mask_targets = MBAS_LABELS
+    # dataset.default_mask_targets = MBAS_LABELS
+    # https://docs.voxel51.com/user_guide/using_datasets.html#storing-mask-targets
+    dataset.mask_targets = {
+        "ground_truth": MBAS_LABELS,
+        predictions_name: MBAS_LABELS,
+        "binary_mask": {0: "Background", 1: "Atrium"},
+    }
     dataset.add_samples(samples)
     color_scheme = make_color_scheme(predictions_name)
     launch_fiftyone_app(dataset, color_scheme, port=port)
@@ -197,6 +213,13 @@ Render video for each subject
         default="predictions",
     )
     parser.add_argument(
+        "-b",
+        "--binary-mask-dir",
+        type=str,
+        nargs="+",
+        default=[],
+    )
+    parser.add_argument(
         "--port",
         type=int,
         default=5151,
@@ -212,6 +235,7 @@ if __name__ == "__main__":
             args.dataset_name,
             args.predictions_dir,
             args.predictions_name,
+            args.binary_mask_dir,
             args.port,
         )
     )
