@@ -85,17 +85,15 @@ sample_class_probabilities = {1: 0.5, 2: 0.25, 3: 0.25}
 
 ## Experiment ideas
 ### 1: Add dilation (buffer) to binary mask
-- adding dilation 1 to binary mask increased the accuracy
+- adding dilation to binary mask increased the accuracy. Increasing dilation to 2 actually performed better than dilation 1
 
 |    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
 |----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
 |  8 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   11.6667  |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
 |  9 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05                                        |     10 |   12.6667  |   0.723894 |     2.84257 |   0.925716  |      3.03093 |   0.932273 |     3.93802 |
-| 68 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_cascade_ResEncUNet_08_27                               |     12 |   15.5     |   0.723734 |     2.82654 |   0.924743  |      3.27531 |   0.931603 |     3.87116 |
-| 67 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_cascade_ResEncUNet_08_27                                    |     14 |   17.8333  |   0.720656 |     2.88458 |   0.925382  |      3.20052 |   0.931084 |     3.87481 |
-
-IN PROGRESS
-ResEncUNet_p20_256_dil2_cascade_ResEncUNet_08_27
+| 75 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil2_cascade_ResEncUNet_08_27                               |     11 |   15.3333  |   0.724251 |     2.74407 |   0.925197  |      3.3252  |   0.932641 |     3.7535  |
+| 11 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_cascade_ResEncUNet_08_27                               |     13 |   17.5     |   0.723734 |     2.82654 |   0.924743  |      3.27531 |   0.931603 |     3.87116 |
+| 15 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_cascade_ResEncUNet_08_27                                    |     18 |   20.5     |   0.720656 |     2.88458 |   0.925382  |      3.20052 |   0.931084 |     3.87481 |
 
 ### 2: Changing the patch size from (20,256,256) to smaller sizes
 - Reducing the patch size hurt performance
@@ -110,18 +108,16 @@ ResEncUNet_p20_256_dil2_cascade_ResEncUNet_08_27
 | 66 | mbasTrainer__plans_2024_08_30__ResEncUNet_p16_256_dil1_cascade_ResEncUNet_08_27                               |     16 |   18.3333  |   0.720092 |     2.85239 |   0.924964  |      3.20732 |   0.9311   |     3.94005 |
 
 ### 3: Fewer feature dimensions (slim models)
-- It appears that the slim models actually hurt performance. Perhaps for this segmentation task it is useful to have more parameters.
+- It appears that the slim models actually hurt performance. The default model has a maximum of 320 feature channels. Perhaps for this segmentation task it is useful to have more parameters.
 
 |    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
 |----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
 |  8 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   11.6667  |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
 |  9 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05                                        |     10 |   12.6667  |   0.723894 |     2.84257 |   0.925716  |      3.03093 |   0.932273 |     3.93802 |
-| 11 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_cascade_ResEncUNet_08_27                               |     12 |   16.1667  |   0.723734 |     2.82654 |   0.924743  |      3.27531 |   0.931603 |     3.87116 |
-| 73 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_slim96_cascade_ResEncUNet_08_27                        |     14 |   18.1667  |   0.720041 |     2.85943 |   0.926474  |      3.17129 |   0.931497 |     3.92933 |
-| 72 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_slim128_cascade_ResEncUNet_08_27                       |     18 |   20.5     |   0.72171  |     2.8365  |   0.925451  |      3.31875 |   0.93243  |     4.16739 |
-
-IN PROGRESS
-ResEncUNet_p20_256_dil1_slim256_cascade_ResEncUNet_08_27
+| 11 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_cascade_ResEncUNet_08_27                               |     13 |   17.5     |   0.723734 |     2.82654 |   0.924743  |      3.27531 |   0.931603 |     3.87116 |
+| 13 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_slim96_cascade_ResEncUNet_08_27                        |     15 |   19.5     |   0.720041 |     2.85943 |   0.926474  |      3.17129 |   0.931497 |     3.92933 |
+| 74 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_slim256_cascade_ResEncUNet_08_27                       |     17 |   20.1667  |   0.721173 |     2.72213 |   0.92418   |      3.33861 |   0.931766 |     3.76833 |
+| 17 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_slim128_cascade_ResEncUNet_08_27                       |     20 |   21.5     |   0.72171  |     2.8365  |   0.925451  |      3.31875 |   0.93243  |     4.16739 |
 
 ### 4: Adding dropout
 - Adding dropout hurt performance
