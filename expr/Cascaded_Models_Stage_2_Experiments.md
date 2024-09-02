@@ -121,6 +121,8 @@ sample_class_probabilities = {1: 0.5, 2: 0.25, 3: 0.25}
 
 ### 4: Adding dropout
 - Adding dropout hurt performance
+
+
 |    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
 |----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
 |  8 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   11.6667  |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
@@ -131,6 +133,7 @@ sample_class_probabilities = {1: 0.5, 2: 0.25, 3: 0.25}
 ### 5: Combining slim model (128 feature dim), with dropout, with varying patch size
 - Adding dropout hurt performance
 - These models with dropout + slim performed even worse than the baseline model (320 feature dim) without dropout.
+
 |    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
 |----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
 |  8 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   11.6667  |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
