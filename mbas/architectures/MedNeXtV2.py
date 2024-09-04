@@ -273,6 +273,8 @@ class MedNeXtEncoder(nn.Module):
         self.exp_ratio_per_stage = exp_ratio_per_stage
         # we store some things that a potential decoder needs
         self.conv_op = conv_op
+        self.dropout_op = dropout_op
+        self.dropout_op_kwargs = dropout_op_kwargs
         self.kernel_sizes = kernel_sizes
         self.norm_type = norm_type
         self.enable_affine_transform = enable_affine_transform
