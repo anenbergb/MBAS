@@ -85,7 +85,8 @@ sample_class_probabilities = {1: 0.5, 2: 0.25, 3: 0.25}
 
 ## Experiment ideas
 ### 1: Add dilation (buffer) to binary mask
-- adding dilation to binary mask increased the accuracy. Increasing dilation to 2 actually performed better than dilation 1
+- adding dilation 1 and 2 to binary mask increased the accuracy. Increasing dilation to 2 actually performed better than dilation 1
+- increasing dilation to 3 slightly hurt performance. 
 
 |    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
 |----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
@@ -94,6 +95,7 @@ sample_class_probabilities = {1: 0.5, 2: 0.25, 3: 0.25}
 | 75 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil2_cascade_ResEncUNet_08_27                               |     11 |   15.3333  |   0.724251 |     2.74407 |   0.925197  |      3.3252  |   0.932641 |     3.7535  |
 | 11 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_cascade_ResEncUNet_08_27                               |     13 |   17.5     |   0.723734 |     2.82654 |   0.924743  |      3.27531 |   0.931603 |     3.87116 |
 | 15 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_cascade_ResEncUNet_08_27                                    |     18 |   20.5     |   0.720656 |     2.88458 |   0.925382  |      3.20052 |   0.931084 |     3.87481 |
+| 21 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil3_cascade_ResEncUNet_08_27                               |     23 |   24.3333  |   0.72121  |     2.73434 |   0.922903  |      3.39686 |   0.931058 |     3.73003 |
 
 ### 2: Changing the patch size from (20,256,256) to smaller sizes
 - Reducing the patch size hurt performance
@@ -143,3 +145,34 @@ sample_class_probabilities = {1: 0.5, 2: 0.25, 3: 0.25}
 | 72 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_slim128_cascade_ResEncUNet_08_27                       |     18 |   20.5     |   0.72171  |     2.8365  |   0.925451  |      3.31875 |   0.93243  |     4.16739 |
 | 49 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil1_drop50_slim_128_cascade_ResEncUNet_08_27               |     52 |   49       |   0.696401 |     3.19986 |   0.916795  |      3.54396 |   0.916747 |     4.50655 |
 | 55 | mbasTrainer__plans_2024_08_30__ResEncUNet_p16_192_dil1_drop50_slim_128_cascade_ResEncUNet_08_27               |     58 |   53.6667  |   0.692874 |     3.36329 |   0.913402  |      3.57347 |   0.915009 |     4.53102 |
+
+### 6: Using batch_dice
+Whether to use batch dice (pretend all samples in the batch are one image, compute dice loss over that)
+- Using batch_dice improves performance
+
+|    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
+|----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
+|  8 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   13.6667  |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
+| 78 | **mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil2_batch_dice_cascade_ResEncUNet_08_27**                    |     10 |   14.8333  |   0.723445 |     2.72685 |   0.925043  |      3.21474 |   0.931448 |     3.71448 |
+|  9 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05                                        |     11 |   15       |   0.723894 |     2.84257 |   0.925716  |      3.03093 |   0.932273 |     3.93802 |
+| 10 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil2_cascade_ResEncUNet_08_27                               |     12 |   16.1667  |   0.724251 |     2.74407 |   0.925197  |      3.3252  |   0.932641 |     3.7535  |
+
+# 2024-09-02 Experiments
+In this set of experiments I train a MedNextV2 style network.
+
+|    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
+|----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
+|  8 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   13.6667  |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
+|  9 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05                                        |     11 |   15       |   0.723894 |     2.84257 |   0.925716  |      3.03093 |   0.932273 |     3.93802 |
+| 10 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil2_cascade_ResEncUNet_08_27                               |     12 |   16.1667  |   0.724251 |     2.74407 |   0.925197  |      3.3252  |   0.932641 |     3.7535  |
+| 39 | mbasTrainer__plans_2024_09_02__MedNeXtV2_p20_256_dil2_nblocks1346_cascade_ResEncUNet_08_27                    |     41 |   41       |   0.714093 |     3.01824 |   0.91399   |      3.64388 |   0.93027  |     4.06885 |
+
+
+MedNeXtV2_p20_256_dil2_nblocks1346_slim128_cascade_ResEncUNet_08_27
+- reduce the feature dim
+MedNeXtV2_p16_256_dil2_nblocks346_slim128_cascade_ResEncUNet_08_27
+- adds more blocks to the earlier stages
+MedNeXtV2_p16_256_dil2_nblocks346_slim128_stride16to1_cascade_ResEncUNet_08_27
+- This architecture is more similar to the MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05 where the z-axis dimension is downsampled from 16 to 1.
+
+TODO: also use batch_dice = True
