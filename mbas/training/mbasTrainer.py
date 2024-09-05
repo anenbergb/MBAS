@@ -150,6 +150,7 @@ class mbasTrainer(nnUNetTrainer):
         # Treat the 1st stage segmentation output as a mask applied to the loss of the 2nd stage
         self.is_cascaded_mask = config.get("is_cascaded_mask", False)
         self.cascaded_mask_dilation = config.get("cascaded_mask_dilation", 0)
+        self.voxel_sample_z_coverage = config.get("voxel_sample_z_coverage", False)
 
     def initialize(self):
         if not self.was_initialized:
@@ -281,6 +282,7 @@ class mbasTrainer(nnUNetTrainer):
                 pad_sides=None,
                 transforms=tr_transforms,
                 sample_class_probabilities=self.sample_class_probabilities,
+                voxel_sample_z_coverage=self.voxel_sample_z_coverage,
             )
             dl_val = nnUNetDataLoader2D(
                 dataset_val,
@@ -306,6 +308,7 @@ class mbasTrainer(nnUNetTrainer):
                 pad_sides=None,
                 transforms=tr_transforms,
                 sample_class_probabilities=self.sample_class_probabilities,
+                voxel_sample_z_coverage=self.voxel_sample_z_coverage,
             )
             dl_val = nnUNetDataLoader3D(
                 dataset_val,

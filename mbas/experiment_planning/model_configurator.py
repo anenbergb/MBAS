@@ -67,6 +67,7 @@ class MBASTrainerConfigurator:
         oversample_foreground_percent=0.0,
         sample_class_probabilities={1: 0.5, 2: 0.25, 3: 0.25},
         batch_dice=False,
+        voxel_sample_z_coverage=False,
     ):
         """
         batch_dice: whether to use batch dice (pretend all samples in the batch are one image, compute dice loss over that)
