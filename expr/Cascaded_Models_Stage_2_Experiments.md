@@ -159,20 +159,55 @@ Whether to use batch dice (pretend all samples in the batch are one image, compu
 
 # 2024-09-02 Experiments
 In this set of experiments I train a MedNextV2 style network.
+The MedNeXtV2 network architectures explored here have very similar kernels and strides to the the ResEncUNet
+
+The baseline MedNeXtV2_p20_256_dil2_nblocks1346_cascade_ResEncUNet_08_27
+```
+features_per_stage= [32,64,128,256,320,320,320],
+kernel_sizes=[
+    [1, 3, 3],
+    [1, 3, 3],
+    [3, 3, 3],
+    [3, 3, 3],
+    [3, 3, 3],
+    [3, 3, 3],
+    [3, 3, 3],
+],
+strides=[
+    [1, 1, 1],
+    [1, 2, 2],
+    [1, 2, 2],
+    [2, 2, 2],
+    [2, 2, 2],
+    [1, 2, 2],
+    [1, 2, 2],
+],
+n_blocks_per_stage = [1,3,4,6,6,6,6],
+exp_ratio_per_stage = [2,3,4,4,4,4,4],
+```
+MedNeXtV2_p20_256_dil2_nblocks1346_slim128_cascade_ResEncUNet_08_27
+- reduces the max feature dimension to 128 rather than 320
+MedNeXtV2_p16_256_dil2_nblocks346_slim128_cascade_ResEncUNet_08_27
+- reduces the max feature dimension to 128 rather than 320
+- `n_blocks_per_stage` goes from `[1,3,4,6,6,6,6]` to `[3,4,6,6,6,6,6]`
+- reduces the input patch size from (20,256,256) to (16,256,256)
+MedNeXtV2_p16_256_dil2_nblocks346_slim128_stride16to1_cascade_ResEncUNet_08_27
+- reduces the max feature dimension to 128 rather than 320
+- `n_blocks_per_stage` goes from `[1,3,4,6,6,6,6]` to `[3,4,6,6,6,6,6]`
+- reduces the input patch size from (20,256,256) to (16,256,256)
+- downsample the input patch from (16,256,256) to (1,4) rather than (4,4)
+
+The following conclusions can be made from the results
+- The `slim128` model gets better results than the default model. This result agrees with prior experiments.
+- Reducing the input patch size from (20,256,256) to (16,256,256) may improve performance, but improved performance is likely attributed to the additional stage one blocks that were increased from (1,3,4,...) to (3,4,6,...)
+- More downsampling of the input patch from (16,256,256) to (1,4) rather than (4,4) doesn't improve performance.
 
 |    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
 |----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
 |  8 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   13.6667  |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
 |  9 | nnUNetTrainer_MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05                                        |     11 |   15       |   0.723894 |     2.84257 |   0.925716  |      3.03093 |   0.932273 |     3.93802 |
 | 10 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil2_cascade_ResEncUNet_08_27                               |     12 |   16.1667  |   0.724251 |     2.74407 |   0.925197  |      3.3252  |   0.932641 |     3.7535  |
-| 39 | mbasTrainer__plans_2024_09_02__MedNeXtV2_p20_256_dil2_nblocks1346_cascade_ResEncUNet_08_27                    |     41 |   41       |   0.714093 |     3.01824 |   0.91399   |      3.64388 |   0.93027  |     4.06885 |
-
-
-MedNeXtV2_p20_256_dil2_nblocks1346_slim128_cascade_ResEncUNet_08_27
-- reduce the feature dim
-MedNeXtV2_p16_256_dil2_nblocks346_slim128_cascade_ResEncUNet_08_27
-- adds more blocks to the earlier stages
-MedNeXtV2_p16_256_dil2_nblocks346_slim128_stride16to1_cascade_ResEncUNet_08_27
-- This architecture is more similar to the MedNeXt__MedNeXtPlans_2024_07_27__slim_128_oversample_05 where the z-axis dimension is downsampled from 16 to 1.
-
-TODO: also use batch_dice = True
+| 26 | mbasTrainer__plans_2024_09_02__MedNeXtV2_p16_256_dil2_nblocks346_slim128_cascade_ResEncUNet_08_27             |     27 |   30.3333  |   0.718305 |     2.80845 |   0.921939  |      3.31858 |   0.929709 |     4.06074 |
+| 81 | mbasTrainer__plans_2024_09_02__MedNeXtV2_p16_256_dil2_nblocks346_slim128_stride16to1_cascade_ResEncUNet_08_27 |     37 |   38.6667  |   0.716568 |     2.98722 |   0.919821  |      3.35611 |   0.928239 |     4.22568 |
+| 39 | mbasTrainer__plans_2024_09_02__MedNeXtV2_p20_256_dil2_nblocks1346_slim128_cascade_ResEncUNet_08_27            |     41 |   41.5     |   0.712215 |     3.01782 |   0.916912  |      3.36771 |   0.928183 |     4.09686 |
+| 42 | mbasTrainer__plans_2024_09_02__MedNeXtV2_p20_256_dil2_nblocks1346_cascade_ResEncUNet_08_27                    |     44 |   43       |   0.714093 |     3.01824 |   0.91399   |      3.64388 |   0.93027  |     4.06885 |
