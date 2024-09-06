@@ -21,9 +21,12 @@ python mbas/tasks/prepare_cascade_model.py \
 --trainer mbasTrainer \
 --use-crossval-postprocessed
 
-
 TRAINER=mbasTrainer
 PLANS=plans_2024_09_04
+
+# MODEL=MedNeXtV2_p16_256_dil2_zcov_nblocks346_slim128_cascade_ResEncUNet_08_27
+# nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS --c
+# nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 --disable_ensembling
 
 MODEL=MedNeXtV2_p16_256_dil2_bd_zcov_nblocks346_slim128_cascade_ResEncUNet_08_27
 nnUNetv2_train 101 $MODEL 0 -tr $TRAINER -p $PLANS --c
