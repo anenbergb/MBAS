@@ -151,6 +151,19 @@ class mbasTrainer(nnUNetTrainer):
         self.is_cascaded_mask = config.get("is_cascaded_mask", False)
         self.cascaded_mask_dilation = config.get("cascaded_mask_dilation", 0)
         self.voxel_sample_z_coverage = config.get("voxel_sample_z_coverage", False)
+        # Training Data Augmentations
+        self.aug_spatial_p_elastic_deform = config.get(
+            "aug_spatial_p_elastic_deform", 0
+        )
+        self.aug_spatial_p_rotation = config.get("aug_spatial_p_rotation", 0.2)
+        self.aug_spatial_p_scaling = config.get("aug_spatial_p_scaling", 0.2)
+        self.aug_gaussian_noise_p = config.get("aug_gaussian_noise_p", 0.1)
+        self.aug_gaussian_blur_p = config.get("aug_gaussian_blur_p", 0.2)
+        self.aug_brightness_p = config.get("aug_brightness_p", 0.15)
+        self.aug_contrast_p = config.get("aug_contrast_p", 0.15)
+        self.aug_lowres_p = config.get("aug_lowres_p", 0.25)
+        self.aug_gamma_p = config.get("aug_gamma_p", 0.1)
+        self.aug_gamma_p_invert = config.get("aug_gamma_p_invert", 0.3)
 
     def initialize(self):
         if not self.was_initialized:
@@ -250,6 +263,17 @@ class mbasTrainer(nnUNetTrainer):
             ignore_label=self.label_manager.ignore_label,
             is_cascaded_mask=self.is_cascaded_mask,
             cascaded_mask_dilation=self.cascaded_mask_dilation,
+            # Training Data Augmentations
+            aug_spatial_p_elastic_deform=self.aug_spatial_p_elastic_deform,
+            aug_spatial_p_rotation=self.aug_spatial_p_rotation,
+            aug_spatial_p_scaling=self.aug_spatial_p_scaling,
+            aug_gaussian_noise_p=self.aug_gaussian_noise_p,
+            aug_gaussian_blur_p=self.aug_gaussian_blur_p,
+            aug_brightness_p=self.aug_brightness_p,
+            aug_contrast_p=self.aug_contrast_p,
+            aug_lowres_p=self.aug_lowres_p,
+            aug_gamma_p=self.aug_gamma_p,
+            aug_gamma_p_invert=self.aug_gamma_p_invert,
         )
 
         # validation pipeline
@@ -364,6 +388,17 @@ class mbasTrainer(nnUNetTrainer):
         ignore_label: int = None,
         is_cascaded_mask: bool = False,
         cascaded_mask_dilation: int = 0,
+        # Training Data Augmentations
+        aug_spatial_p_elastic_deform: float = 0,
+        aug_spatial_p_rotation: float = 0.2,
+        aug_spatial_p_scaling: float = 0.2,
+        aug_gaussian_noise_p: float = 0.1,
+        aug_gaussian_blur_p: float = 0.2,
+        aug_brightness_p: float = 0.15,
+        aug_contrast_p: float = 0.15,
+        aug_lowres_p: float = 0.25,
+        aug_gamma_p: float = 0.1,
+        aug_gamma_p_invert: float = 0.3,
     ) -> BasicTransform:
         transforms = []
         if do_dummy_2d_data_aug:
@@ -378,10 +413,10 @@ class mbasTrainer(nnUNetTrainer):
                 patch_size_spatial,
                 patch_center_dist_from_border=0,
                 random_crop=False,
-                p_elastic_deform=0,
-                p_rotation=0.2,
+                p_elastic_deform=aug_spatial_p_elastic_deform,
+                p_rotation=aug_spatial_p_rotation,
                 rotation=rotation_for_DA,
-                p_scaling=0.2,
+                p_scaling=aug_spatial_p_scaling,
                 scaling=(0.7, 1.4),
                 p_synchronize_scaling_across_axes=1,
                 bg_style_seg_sampling=False,  # , mode_seg='nearest'
@@ -396,7 +431,7 @@ class mbasTrainer(nnUNetTrainer):
                 GaussianNoiseTransform(
                     noise_variance=(0, 0.1), p_per_channel=1, synchronize_channels=True
                 ),
-                apply_probability=0.1,
+                apply_probability=aug_gaussian_noise_p,
             )
         )
         transforms.append(
@@ -408,7 +443,7 @@ class mbasTrainer(nnUNetTrainer):
                     p_per_channel=0.5,
                     benchmark=True,
                 ),
-                apply_probability=0.2,
+                apply_probability=aug_gaussian_blur_p,
             )
         )
         transforms.append(
@@ -418,7 +453,7 @@ class mbasTrainer(nnUNetTrainer):
                     synchronize_channels=False,
                     p_per_channel=1,
                 ),
-                apply_probability=0.15,
+                apply_probability=aug_brightness_p,
             )
         )
         transforms.append(
@@ -429,7 +464,7 @@ class mbasTrainer(nnUNetTrainer):
                     synchronize_channels=False,
                     p_per_channel=1,
                 ),
-                apply_probability=0.15,
+                apply_probability=aug_contrast_p,
             )
         )
         transforms.append(
@@ -442,7 +477,7 @@ class mbasTrainer(nnUNetTrainer):
                     allowed_channels=None,
                     p_per_channel=0.5,
                 ),
-                apply_probability=0.25,
+                apply_probability=aug_lowres_p,
             )
         )
         transforms.append(
@@ -454,7 +489,7 @@ class mbasTrainer(nnUNetTrainer):
                     p_per_channel=1,
                     p_retain_stats=1,
                 ),
-                apply_probability=0.1,
+                apply_probability=aug_gamma_p,
             )
         )
         transforms.append(
@@ -466,7 +501,7 @@ class mbasTrainer(nnUNetTrainer):
                     p_per_channel=1,
                     p_retain_stats=1,
                 ),
-                apply_probability=0.3,
+                apply_probability=aug_gamma_p_invert,
             )
         )
         if mirror_axes is not None and len(mirror_axes) > 0:

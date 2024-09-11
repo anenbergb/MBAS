@@ -121,6 +121,25 @@ class MBASTrainerConfigurator:
         self.current_configuration["previous_stage"] = previous_stage
         return self
 
+    def set_data_augmentation(
+        self,
+        aug_spatial_p_elastic_deform: float = 0,
+        aug_spatial_p_rotation: float = 0.2,
+        aug_spatial_p_scaling: float = 0.2,
+        aug_gaussian_noise_p: float = 0.1,
+        aug_gaussian_blur_p: float = 0.2,
+        aug_brightness_p: float = 0.15,
+        aug_contrast_p: float = 0.15,
+        aug_lowres_p: float = 0.25,
+        aug_gamma_p: float = 0.1,
+        aug_gamma_p_invert: float = 0.3,
+    ):
+        args_dict = locals()
+        for k, v in args_dict.items():
+            if k != "self":
+                self.current_configuration[k] = v
+        return self
+
     def MedNeXtV1(
         self,
         features_per_stage=(32, 64, 128, 256, 320, 320, 320),
