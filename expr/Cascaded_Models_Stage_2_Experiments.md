@@ -211,3 +211,70 @@ The following conclusions can be made from the results
 | 81 | mbasTrainer__plans_2024_09_02__MedNeXtV2_p16_256_dil2_nblocks346_slim128_stride16to1_cascade_ResEncUNet_08_27 |     37 |   38.6667  |   0.716568 |     2.98722 |   0.919821  |      3.35611 |   0.928239 |     4.22568 |
 | 39 | mbasTrainer__plans_2024_09_02__MedNeXtV2_p20_256_dil2_nblocks1346_slim128_cascade_ResEncUNet_08_27            |     41 |   41.5     |   0.712215 |     3.01782 |   0.916912  |      3.36771 |   0.928183 |     4.09686 |
 | 42 | mbasTrainer__plans_2024_09_02__MedNeXtV2_p20_256_dil2_nblocks1346_cascade_ResEncUNet_08_27                    |     44 |   43       |   0.714093 |     3.01824 |   0.91399   |      3.64388 |   0.93027  |     4.06885 |
+
+# 2024-09-10 Experiments
+
+### 1: Increasing patch size from (20,256,256)
+The best performing model according to the average rank is the `nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2`, which is 7-stage ResEncUNet trained on large `(32,384,384)` patches.
+```
+features_per_stage= [32,64,128,256,320,320,320],
+kernel_sizes=[
+    [1, 3, 3],
+    [1, 3, 3],
+    [3, 3, 3],
+    [3, 3, 3],
+    [3, 3, 3],
+    [3, 3, 3],
+    [3, 3, 3],
+],
+strides=[
+    [1, 1, 1],
+    [1, 2, 2],
+    [1, 2, 2],
+    [2, 2, 2],
+    [2, 2, 2],
+    [2, 2, 2],
+    [1, 2, 2],
+],
+n_blocks_per_stage=[1, 3, 4, 6, 6, 6, 6],
+n_conv_per_stage_decoder=[1, 1, 1, 1, 1, 1],
+```
+
+In this set of experiments I build upon the results of the best performing cascaded model `mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil2_cascade_ResEncUNet_08_27` by retaining
+- 2-stage cascaded architecture
+- dilation (buffer) of size 2 around the 1st stage binary mask predictions
+Experiment with patch sizes `(32,384,384)`, and `(32,256,256)`
+
+### 2: Data Augmentation
+Increase the likelihood of applying data augmentation to the sampled patches
+
+ResEncUNet_p20_256_dil2_bd_aug01_cascade_ResEncUNet_08_27
+```
+    aug_spatial_p_rotation = 0.5,
+    aug_spatial_p_scaling = 0.4,
+    aug_gaussian_noise_p = 0.3,
+    aug_gaussian_blur_p = 0.3,
+    aug_brightness_p = 0.15,
+    aug_contrast_p = 0.15,
+    aug_lowres_p = 0.0,
+```
+ResEncUNet_p20_256_dil2_bd_aug02_cascade_ResEncUNet_08_27
+```
+    aug_spatial_p_rotation = 0.5,
+    aug_spatial_p_scaling = 0.4,
+    aug_gaussian_noise_p = 0.0,
+    aug_gaussian_blur_p = 0.0,
+    aug_brightness_p = 0.15,
+    aug_contrast_p = 0.15,
+    aug_lowres_p = 0.0,
+```
+ResEncUNet_p20_256_dil2_bd_aug03_cascade_ResEncUNet_08_27
+```
+    aug_spatial_p_scaling = 0.0,
+    aug_lowres_p = 0.0,
+```
+
+### 4: Train where 1st Stage inference results do not use postprocessing
+- regular ResEnc but where first stage doesn't run postprocessing (so don't reject any disconnected small segmentations because  left and right atrium can be separate)
+
+ResEncUNet_p20_256_dil2_bd_cascade_ResEncUNet_08_27_nopost
