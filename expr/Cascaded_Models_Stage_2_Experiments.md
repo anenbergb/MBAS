@@ -249,7 +249,9 @@ Experiment with patch sizes `(32,384,384)`, and `(32,256,256)`
 |----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
 |  8 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   14.3333  |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
 |  9 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil2_batch_dice_cascade_ResEncUNet_08_27                    |     10 |   15.3333  |   0.723445 |     2.72685 |   0.925043  |      3.21474 |   0.931448 |     3.71448 |
-| 86 | mbasTrainer__plans_2024_09_10__ResEncUNet_p32_256_dil2_bd_cascade_ResEncUNet_08_27                            |     28 |   28.5     |   0.722941 |     2.85907 |   0.92196   |      3.39422 |   0.93142  |     3.81499 |
+| 27 | mbasTrainer__plans_2024_09_10__ResEncUNet_p32_256_dil2_bd_cascade_ResEncUNet_08_27                            |     28 |   29.3333  |   0.722941 |     2.85907 |   0.92196   |      3.39422 |   0.93142  |     3.81499 |
+| 88 | mbasTrainer__plans_2024_09_10__ResEncUNet_p32_384_dil2_bd_cascade_ResEncUNet_08_27                            |     30 |   31.8333  |   0.720422 |     2.91118 |   0.923577  |      3.22313 |   0.929422 |     4.06153 |
+
 
 ### 2: Data Augmentation
 Increase the likelihood of applying data augmentation to the sampled patches
