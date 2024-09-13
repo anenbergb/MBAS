@@ -110,6 +110,7 @@ def per_subject_metrics(
     save_filepath: str | None = None,
     label_key: str = "label",
     use_binary_label_as_all_labels: bool = False,
+    print_table: bool = False,
 ):
     add_binary = label_key == "binary_label"
     if label_key == "label":
@@ -133,6 +134,8 @@ def per_subject_metrics(
         logger.info(f"Saved per subject metrics to {save_filepath}")
     avg_df = make_average_table(df)
     print(tabulate(avg_df, headers="keys", tablefmt="github"))
+    if print_table:
+        print(tabulate(df, headers="keys", tablefmt="github"))
 
 
 def get_args() -> argparse.Namespace:
@@ -166,6 +169,11 @@ Compute Dice score and Hausdorff distance per subject.
         action="store_true",
         default=False,
     )
+    parser.add_argument(
+        "--print-table",
+        action="store_true",
+        default=False,
+    )
     return parser.parse_args()
 
 
@@ -178,5 +186,6 @@ if __name__ == "__main__":
             args.save,
             args.label_key,
             args.use_binary_label_as_all_labels,
+            args.print_table,
         )
     )
