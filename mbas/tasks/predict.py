@@ -13,6 +13,7 @@ import numpy as np
 from dataclasses import dataclass
 
 from mbas.training.mbasTrainer import mbasTrainer
+from mbas.utils.binary_dilation_transform import binary_dilation_transform
 
 # from acvl_utils.cropping_and_padding.padding import pad_nd_image
 from nnunetv2.utilities.plans_handling.plans_handler import (
@@ -35,6 +36,10 @@ from nnunetv2.inference.export_prediction import (
     convert_predicted_logits_to_segmentation_with_correct_shape,
 )
 
+from nnunetv2.postprocessing.remove_connected_components import (
+    remove_all_but_largest_component_from_segmentation,
+)
+
 
 @dataclass
 class Parameters2Stage:
@@ -53,9 +58,12 @@ class NetworkConfig:
     configuration_manager: ConfigurationManager
     trainer_name: str
     inference_allowed_mirroring_axes: Optional[List[int]] = None
+    postprocessing_kwargs: list
 
 
-def initialize_model(checkpoint: dict, dataset_json: dict, plans: dict):
+def initialize_model(
+    checkpoint: dict, dataset_json: dict, plans: dict, postprocessing_kwargs: list
+):
     plans_manager = PlansManager(plans)
     trainer_name = checkpoint["trainer_name"]
     configuration_name = checkpoint["init_args"]["configuration"]
@@ -87,6 +95,7 @@ def initialize_model(checkpoint: dict, dataset_json: dict, plans: dict):
         configuration_manager=configuration_manager,
         trainer_name=trainer_name,
         inference_allowed_mirroring_axes=inference_allowed_mirroring_axes,
+        postprocessing_kwargs=postprocessing_kwargs,
     )
 
 
@@ -108,6 +117,7 @@ def index_images(input_dir: str, output_dir: str) -> list[Filepath]:
                         save_path=os.path.join(output_dir, pred_file_name),
                     )
                 )
+    filepaths = sorted(filepaths, key=lambda x: x.path)
     return filepaths
 
 
@@ -123,7 +133,14 @@ class Preprocessor:
         self.dataset_json = dataset_json
         self.preprocessor = DefaultPreprocessor(verbose=True)
 
-    def preprocess_image(self, image_filepath: str):
+    def load_image(self, image_filepath: str):
+        rw = self.plans_manager.image_reader_writer_class()
+        data, data_properties = rw.read_images([image_filepath])
+        return data, data_properties
+
+    def preprocess_image(
+        self, data: np.ndarray, data_properties: dict, seg: Optional[np.ndarray] = None
+    ):
         """
         - load volume using SimpleITKIO
         - normalize volume
@@ -131,20 +148,26 @@ class Preprocessor:
             (1,44,640,640) -> (1,44,410,410)
 
         data: normalized, cropped volume
-        seg: cropped foreground mask
+        seg: Segmentation mask will be cropped and resampled alongside the volume.
+            If seg is None, then the returned segmentation mask is just the nonzero mask
         data_properties: data properties loaded alongisde the original volume
         """
-        data, seg, data_properties = self.preprocessor.run_case(
-            image_files=[image_filepath],
-            seg_file=None,
+
+        data_pp, seg_pp = self.preprocessor.run_case_npy(
+            data,
+            seg=seg,
+            properties=data_properties,
             plans_manager=self.plans_manager,
             configuration_manager=self.configuration_manager,
             dataset_json=self.dataset_json,
         )
-        data = torch.from_numpy(data).to(
+        data_pp = torch.from_numpy(data_pp).to(
             dtype=torch.float32, memory_format=torch.contiguous_format
         )
-        return data, data_properties
+        seg_pp = torch.from_numpy(seg_pp).to(
+            dtype=torch.float32, memory_format=torch.contiguous_format
+        )
+        return data_pp, seg_pp
 
 
 class Predictor:
@@ -172,38 +195,44 @@ class Predictor:
             inference_allowed_mirroring_axes=network_config.inference_allowed_mirroring_axes,
         )
 
-    def predict(self, data: torch.Tensor, data_properties: dict):
+    def predict(
+        self,
+        data: torch.Tensor,
+        data_properties: dict,
+        seg_mask: Optional[torch.Tensor] = None,
+    ):
         """
         data should be preprocessed
         """
-        import ipdb
-
-        ipdb.set_trace()
-        # same shape as preprocessed data
+        # data shape (1,44,410,410)
+        # prediction shape (2,44,410,410)
         prediction = self.predictor.predict_sliding_window_return_logits(data).to("cpu")
 
-        # is_cascaded_mask = self.network_config.configuration_manager.configuration.get("is_cascaded_mask", False)
-        # if is_cascaded_mask:
-        #     # prediction.shape (4,44,574,574)
-        #     # mask shape (1,44,574,574)
-        #     seg = preprocessed["seg"]
-        #     seg[seg < 0] = 0
-        #     mask = torch.from_numpy(seg).to(torch.bool)
+        is_cascaded_mask = self.network_config.configuration_manager.configuration.get(
+            "is_cascaded_mask", False
+        )
+        if is_cascaded_mask and seg_mask is not None:
+            # prediction.shape (4,44,574,574)
+            # mask shape (1,44,574,574)
+            seg[seg < 0] = 0
+            mask = seg.to(torch.bool)
 
-        #     cascaded_mask_dilation = self.configuration_manager.configuration.get("cascaded_mask_dilation", 0)
-        #     if cascaded_mask_dilation > 0:
-        #         from mbas.utils.binary_dilation_transform import binary_dilation_transform
-        #         mask[0] = binary_dilation_transform(
-        #             mask[0], cascaded_mask_dilation
-        #         )
+            cascaded_mask_dilation = (
+                self.network_config.configuration_manager.configuration.get(
+                    "cascaded_mask_dilation", 0
+                )
+            )
+            if cascaded_mask_dilation > 0:
+                mask[0] = binary_dilation_transform(mask[0], cascaded_mask_dilation)
 
-        #     # background class-0 prediction is the first channel
-        #     # set the un-masked region (background) to 1
-        #     # leave the masked region (foreground) as is
-        #     prediction[0] = torch.where(mask, prediction[0], 1.0)
-        #     # zero out the background for the other channels
-        #     prediction[1:] = prediction[1:] * mask
+            # background class-0 prediction is the first channel
+            # set the un-masked region (background) to 1
+            # leave the masked region (foreground) as is
+            prediction[0] = torch.where(mask, prediction[0], 1.0)
+            # zero out the background for the other channels
+            prediction[1:] = prediction[1:] * mask
 
+        # seg shape (44, 640, 640)
         seg = convert_predicted_logits_to_segmentation_with_correct_shape(
             prediction,
             self.predictor.plans_manager,
@@ -212,168 +241,21 @@ class Predictor:
             data_properties,
             return_probabilities=False,
         )
+        # for the 2nd stage, remove all but the largest component for each of the labels independently
+        seg_pp = self.apply_postprocessing(seg)
+
         # clear lru cache
         compute_gaussian.cache_clear()
         # clear device cache
         empty_cache(self.device)
-        return seg
+        return seg_pp
 
-    # # def predict_logits_from_preprocessed_data(self, data: torch.Tensor) -> torch.Tensor:
-    # #     prediction = None
-    # #     for params in self.list_of_parameters:
-
-    # #         # messing with state dict names...
-    # #         if not isinstance(self.network, OptimizedModule):
-    # #             self.network.load_state_dict(params)
-    # #         else:
-    # #             self.network._orig_mod.load_state_dict(params)
-
-    # #         # why not leave prediction on device if perform_everything_on_device? Because this may cause the
-    # #         # second iteration to crash due to OOM. Grabbing that with try except cause way more bloated code than
-    # #         # this actually saves computation time
-    # #         if prediction is None:
-    # #             prediction = self.predict_sliding_window_return_logits(data).to('cpu')
-    # #         else:
-    # #             prediction += self.predict_sliding_window_return_logits(data).to('cpu')
-
-    # #     if len(self.list_of_parameters) > 1:
-    # #         prediction /= len(self.list_of_parameters)
-
-    # #     if self.verbose: print('Prediction done')
-    # #     torch.set_num_threads(n_threads)
-    # #     return prediction
-
-    # @torch.inference_mode()
-    # def predict_sliding_window_return_logits(self, input_image: torch.Tensor) -> torch.Tensor:
-    #     assert isinstance(input_image, torch.Tensor)
-    #     self.network = self.network.to(self.device)
-    #     self.network.eval()
-
-    #     empty_cache(self.device)
-
-    #     with torch.autocast(self.device.type, enabled=True):
-    #         assert input_image.ndim == 4, 'input_image must be a 4D np.ndarray or torch.Tensor (c, x, y, z)'
-
-    #         if self.verbose:
-    #             print(f'Input shape: {input_image.shape}')
-    #             print("step_size:", self.tile_step_size)
-    #             print("mirror_axes:", self.allowed_mirroring_axes if self.use_mirroring else None)
-
-    #         # if input_image is smaller than tile_size we need to pad it to tile_size.
-    #         data, slicer_revert_padding = pad_nd_image(input_image, self.configuration_manager.patch_size,
-    #                                                    'constant', {'value': 0}, True,
-    #                                                    None)
-
-    #         slicers = self._internal_get_sliding_window_slicers(data.shape[1:])
-
-    #         if self.perform_everything_on_device:
-    #             # we need to try except here because we can run OOM in which case we need to fall back to CPU as a results device
-    #             try:
-    #                 predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers,
-    #                                                                                        self.perform_everything_on_device)
-    #             except RuntimeError:
-    #                 print(
-    #                     'Prediction on device was unsuccessful, probably due to a lack of memory. Moving results arrays to CPU')
-    #                 empty_cache(self.device)
-    #                 predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers, False)
-    #         else:
-    #             predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers,
-    #                                                                                    self.perform_everything_on_device)
-
-    #         empty_cache(self.device)
-    #         # revert padding
-    #         predicted_logits = predicted_logits[(slice(None), *slicer_revert_padding[1:])]
-
-    # def _internal_predict_sliding_window_return_logits(self,
-    #                                                    data: torch.Tensor,
-    #                                                    slicers,
-    #                                                    do_on_device: bool = True,
-    #                                                    ):
-    #     predicted_logits = n_predictions = prediction = gaussian = workon = None
-    #     results_device = self.device if do_on_device else torch.device('cpu')
-
-    #     try:
-    #         empty_cache(self.device)
-
-    #         # move data to device
-    #         if self.verbose:
-    #             print(f'move image to device {results_device}')
-    #         data = data.to(results_device)
-
-    #         # preallocate arrays
-    #         if self.verbose:
-    #             print(f'preallocating results arrays on device {results_device}')
-    #         predicted_logits = torch.zeros((self.label_manager.num_segmentation_heads, *data.shape[1:]),
-    #                                        dtype=torch.half,
-    #                                        device=results_device)
-    #         n_predictions = torch.zeros(data.shape[1:], dtype=torch.half, device=results_device)
-
-    #         if self.use_gaussian:
-    #             gaussian = compute_gaussian(tuple(self.configuration_manager.patch_size), sigma_scale=1. / 8,
-    #                                         value_scaling_factor=10,
-    #                                         device=results_device)
-    #         else:
-    #             gaussian = 1
-
-    #         if not self.allow_tqdm and self.verbose:
-    #             print(f'running prediction: {len(slicers)} steps')
-    #         for sl in slicers:
-    #             workon = data[sl][None]
-    #             workon = workon.to(self.device)
-
-    #             prediction = self._internal_maybe_mirror_and_predict(workon)[0].to(results_device)
-
-    #             if self.use_gaussian:
-    #                 prediction *= gaussian
-    #             predicted_logits[sl] += prediction
-    #             n_predictions[sl[1:]] += gaussian
-
-    #         predicted_logits /= n_predictions
-    #         # check for infs
-    #         if torch.any(torch.isinf(predicted_logits)):
-    #             raise RuntimeError('Encountered inf in predicted array. Aborting... If this problem persists, '
-    #                                'reduce value_scaling_factor in compute_gaussian or increase the dtype of '
-    #                                'predicted_logits to fp32')
-    #     except Exception as e:
-    #         del predicted_logits, n_predictions, prediction, gaussian, workon
-    #         empty_cache(self.device)
-    #         empty_cache(results_device)
-    #         raise e
-    #     return predicted_logits
-
-    # def _internal_get_sliding_window_slicers(self, image_size: Tuple[int, ...]):
-    #     slicers = []
-    #     if len(self.configuration_manager.patch_size) < len(image_size):
-    #         assert len(self.configuration_manager.patch_size) == len(
-    #             image_size) - 1, 'if tile_size has less entries than image_size, ' \
-    #                              'len(tile_size) ' \
-    #                              'must be one shorter than len(image_size) ' \
-    #                              '(only dimension ' \
-    #                              'discrepancy of 1 allowed).'
-    #         steps = compute_steps_for_sliding_window(image_size[1:], self.configuration_manager.patch_size,
-    #                                                  self.tile_step_size)
-    #         if self.verbose: print(f'n_steps {image_size[0] * len(steps[0]) * len(steps[1])}, image size is'
-    #                                f' {image_size}, tile_size {self.configuration_manager.patch_size}, '
-    #                                f'tile_step_size {self.tile_step_size}\nsteps:\n{steps}')
-    #         for d in range(image_size[0]):
-    #             for sx in steps[0]:
-    #                 for sy in steps[1]:
-    #                     slicers.append(
-    #                         tuple([slice(None), d, *[slice(si, si + ti) for si, ti in
-    #                                                  zip((sx, sy), self.configuration_manager.patch_size)]]))
-    #     else:
-    #         steps = compute_steps_for_sliding_window(image_size, self.configuration_manager.patch_size,
-    #                                                  self.tile_step_size)
-    #         if self.verbose: print(
-    #             f'n_steps {np.prod([len(i) for i in steps])}, image size is {image_size}, tile_size {self.configuration_manager.patch_size}, '
-    #             f'tile_step_size {self.tile_step_size}\nsteps:\n{steps}')
-    #         for sx in steps[0]:
-    #             for sy in steps[1]:
-    #                 for sz in steps[2]:
-    #                     slicers.append(
-    #                         tuple([slice(None), *[slice(si, si + ti) for si, ti in
-    #                                               zip((sx, sy, sz), self.configuration_manager.patch_size)]]))
-    #     return slicers
+    def apply_postprocessing(self, segmentation: np.ndarray):
+        for kwargs in self.network_config.postprocessing_kwargs:
+            segmentation = remove_all_but_largest_component_from_segmentation(
+                segmentation, **kwargs
+            )
+        return segmentation
 
 
 def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
@@ -395,47 +277,43 @@ def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
     image_filepaths = index_images(input_dir, output_dir)
 
     stage1_network = initialize_model(
-        parameters.stage1_checkpoint, parameters.stage1_dataset, parameters.stage1_plans
+        parameters.stage1_checkpoint,
+        parameters.stage1_dataset,
+        parameters.stage1_plans,
+        parameters.stage1_postprocessing_kwargs,
     )
-    # stage2_model = initialize_model(
-    #     parameters.stage2_checkpoint, parameters.stage2_dataset, parameters.stage2_plans
-    # )
+    stage2_network = initialize_model(
+        parameters.stage2_checkpoint,
+        parameters.stage2_dataset,
+        parameters.stage2_plans,
+        parameters.stage2_postprocessing_kwargs,
+    )
+
     stage1_preprocessor = Preprocessor(
         stage1_network.plans_manager,
         stage1_network.configuration_manager,
         parameters.stage1_dataset,
     )
-    stage1_predictor = Predictor(stage1_network, parameters.stage1_dataset)
-
-    data, data_properties = stage1_preprocessor.preprocess_image(
-        image_filepaths[0].path
+    stage2_preprocessor = Preprocessor(
+        stage2_network.plans_manager,
+        stage2_network.configuration_manager,
+        parameters.stage2_dataset,
     )
-    seg = stage1_predictor.predict(data, data_properties)
 
-    # consider preprocessing the segmentation from 1st stage
-    # do you need to convert it to one-hot? probably not
+    stage1_predictor = Predictor(stage1_network, parameters.stage1_dataset)
+    stage2_predictor = Predictor(stage2_network, parameters.stage2_dataset)
 
-    import ipdb
+    data, data_properties = stage1_preprocessor.load_image(image_filepaths[0].path)
+    data1_pp, _ = stage1_preprocessor.preprocess_image(data, data_properties)
+    seg1 = stage1_predictor.predict(data1_pp, data_properties)
 
-    ipdb.set_trace()
-    print("Completed model initialization")
+    data2_pp, seg1_pp = stage2_preprocessor.preprocess_image(
+        data, data_properties, seg1
+    )
+    seg2 = stage2_predictor.predict(data2_pp, data_properties, seg1_pp)
 
-    # # predict the results, here is just an example. Pls build your own logic here
-    # for subdir, dirs, files in os.walk(args.input_dir):
-    #     for file in files:
-    #         if file.endswith('_gt.nii.gz'):
-    #             file_path = os.path.join(subdir, file)
-    #             img = sitk.ReadImage(file_path)
-    #             predict = sitk.BinaryThreshold(img, lowerThreshold=400, upperThreshold=500)
-
-    #             '''
-    #             pls check the resolution of the predict mask, making it same with the input
-    #             For example: input (640,640,44)--> output (640,640,44)
-    #             '''
-    #             pred_file_name = file.replace('_gt', '_label')
-    #             sitk.WriteImage(predict, os.path.join(args.output_dir, pred_file_name))
-
-    # print('Generate finished!')
+    rw = stage2_network.plans_manager.image_reader_writer_class()
+    rw.write_seg(seg2, image_filepaths[0].save_path, data_properties)
 
 
 def get_args() -> argparse.Namespace:
