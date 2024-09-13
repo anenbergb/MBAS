@@ -282,6 +282,16 @@ ResEncUNet_p20_256_dil2_bd_aug03_cascade_ResEncUNet_08_27
     aug_lowres_p = 0.0,
 ```
 
+|    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
+|----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
+|  8 | nnUNetTrainer__nnUNetResEncUNetLPlans__3d_fullres2                                                            |      9 |   14.3333  |   0.725331 |     2.76333 |   0.92567   |      3.20032 |   0.930359 |     3.68754 |
+|  9 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil2_batch_dice_cascade_ResEncUNet_08_27                    |     10 |   15.3333  |   0.723445 |     2.72685 |   0.925043  |      3.21474 |   0.931448 |     3.71448 |
+| 91 | mbasTrainer__plans_2024_09_10__ResEncUNet_p20_256_dil2_bd_aug03_cascade_ResEncUNet_08_27                      |     26 |   29.1667  |   0.720697 |     2.85116 |   0.924578  |      3.37887 |   0.931369 |     3.8154  |
+| 31 | mbasTrainer__plans_2024_09_10__ResEncUNet_p20_256_dil2_bd_aug01_cascade_ResEncUNet_08_27                      |     33 |   34.8333  |   0.718293 |     2.8549  |   0.921701  |      3.32903 |   0.930367 |     3.79884 |
+| 32 | mbasTrainer__plans_2024_09_10__ResEncUNet_p20_256_dil2_bd_aug02_cascade_ResEncUNet_08_27                      |     34 |   35.3333  |   0.71676  |     2.75316 |   0.920764  |      3.46288 |   0.931163 |     3.75921 |
+
+The other data augmentation schemes performed worse than the baseline `ResEncUNet_p20_256_dil2_batch_dice_cascade_ResEncUNet_08_27`. 
+
 ### 4: Train where 1st Stage inference results do not use postprocessing
 - regular ResEnc but where first stage doesn't run postprocessing (so don't reject any disconnected small segmentations because  left and right atrium can be separate)
 
