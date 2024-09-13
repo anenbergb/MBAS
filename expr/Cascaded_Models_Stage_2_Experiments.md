@@ -252,6 +252,7 @@ Experiment with patch sizes `(32,384,384)`, and `(32,256,256)`
 | 27 | mbasTrainer__plans_2024_09_10__ResEncUNet_p32_256_dil2_bd_cascade_ResEncUNet_08_27                            |     28 |   29.3333  |   0.722941 |     2.85907 |   0.92196   |      3.39422 |   0.93142  |     3.81499 |
 | 88 | mbasTrainer__plans_2024_09_10__ResEncUNet_p32_384_dil2_bd_cascade_ResEncUNet_08_27                            |     30 |   31.8333  |   0.720422 |     2.91118 |   0.923577  |      3.22313 |   0.929422 |     4.06153 |
 
+The baseline `ResEncUNet_p20_256_dil2_batch_dice_cascade_ResEncUNet_08_27` performed better than the larger patch size alternatives.
 
 ### 2: Data Augmentation
 Increase the likelihood of applying data augmentation to the sampled patches
@@ -293,10 +294,11 @@ ResEncUNet_p20_256_dil2_bd_aug03_cascade_ResEncUNet_08_27
 The other data augmentation schemes performed worse than the baseline `ResEncUNet_p20_256_dil2_batch_dice_cascade_ResEncUNet_08_27`. 
 
 ### 4: Train where 1st Stage inference results do not use postprocessing
-- regular ResEnc but where first stage doesn't run postprocessing (so don't reject any disconnected small segmentations because  left and right atrium can be separate)
+- regular ResEnc but where first stage doesn't run postprocessing (so don't reject any disconnected small segmentations because left and right atrium can be separate)
 
 |    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
 |----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
 |  9 | mbasTrainer__plans_2024_08_30__ResEncUNet_p20_256_dil2_batch_dice_cascade_ResEncUNet_08_27                    |     10 |   15.3333  |   0.723445 |     2.72685 |   0.925043  |      3.21474 |   0.931448 |     3.71448 |
 | 87 | mbasTrainer__plans_2024_09_11__ResEncUNet_p20_256_dil2_bd_cascade_ResEncUNet_08_27_nopost                     |     29 |   30       |   0.71969  |     2.83977 |   0.924093  |      3.35865 |   0.930651 |     3.81915 |
 
+The baseline performs better. 
