@@ -10,7 +10,7 @@ import torch
 from torch import nn
 import SimpleITK as sitk
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from mbas.training.mbasTrainer import mbasTrainer
 from mbas.utils.binary_dilation_transform import binary_dilation_transform
@@ -57,8 +57,8 @@ class NetworkConfig:
     plans_manager: PlansManager
     configuration_manager: ConfigurationManager
     trainer_name: str
-    inference_allowed_mirroring_axes: Optional[List[int]] = None
-    postprocessing_kwargs: list
+    inference_allowed_mirroring_axes: List[int]
+    postprocessing_kwargs: List[dict]
 
 
 def initialize_model(
@@ -152,6 +152,8 @@ class Preprocessor:
             If seg is None, then the returned segmentation mask is just the nonzero mask
         data_properties: data properties loaded alongisde the original volume
         """
+        if seg is not None and seg.ndim == 3:
+            seg = seg[np.newaxis, :]
 
         data_pp, seg_pp = self.preprocessor.run_case_npy(
             data,
@@ -200,6 +202,7 @@ class Predictor:
         data: torch.Tensor,
         data_properties: dict,
         seg_mask: Optional[torch.Tensor] = None,
+        return_seg_without_pp: bool = False,
     ):
         """
         data should be preprocessed
@@ -214,8 +217,8 @@ class Predictor:
         if is_cascaded_mask and seg_mask is not None:
             # prediction.shape (4,44,574,574)
             # mask shape (1,44,574,574)
-            seg[seg < 0] = 0
-            mask = seg.to(torch.bool)
+            seg_mask[seg_mask < 0] = 0
+            mask = seg_mask.to(torch.bool)
 
             cascaded_mask_dilation = (
                 self.network_config.configuration_manager.configuration.get(
@@ -248,6 +251,8 @@ class Predictor:
         compute_gaussian.cache_clear()
         # clear device cache
         empty_cache(self.device)
+        if return_seg_without_pp:
+            return seg_pp, seg
         return seg_pp
 
     def apply_postprocessing(self, segmentation: np.ndarray):
@@ -258,7 +263,25 @@ class Predictor:
         return segmentation
 
 
+def write_seg(
+    seg: np.ndarray,
+    save_path: str,
+    seg_name: str,
+    plans_manager: PlansManager,
+    data_properties: dict,
+):
+    filename = os.path.basename(save_path)
+    dirname = os.path.dirname(save_path)
+    output_dir = os.path.join(dirname, seg_name)
+    os.makedirs(output_dir, exist_ok=True)
+    filepath = os.path.join(output_dir, filename)
+    rw = plans_manager.image_reader_writer_class()
+    rw.write_seg(seg, filepath, data_properties)
+
+
 def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
+    debug = True
+
     assert os.path.exists(input_dir), f"Input directory {input_dir} does not exist"
     assert os.path.exists(model_pth), f"Model path {model_pth} does not exist"
 
@@ -303,17 +326,51 @@ def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
     stage1_predictor = Predictor(stage1_network, parameters.stage1_dataset)
     stage2_predictor = Predictor(stage2_network, parameters.stage2_dataset)
 
-    data, data_properties = stage1_preprocessor.load_image(image_filepaths[0].path)
+    image_filepath_struct = image_filepaths[4]
+    data, data_properties = stage1_preprocessor.load_image(image_filepath_struct.path)
     data1_pp, _ = stage1_preprocessor.preprocess_image(data, data_properties)
-    seg1 = stage1_predictor.predict(data1_pp, data_properties)
-
-    data2_pp, seg1_pp = stage2_preprocessor.preprocess_image(
-        data, data_properties, seg1
+    seg1_pp, seg1 = stage1_predictor.predict(
+        data1_pp, data_properties, return_seg_without_pp=True
     )
-    seg2 = stage2_predictor.predict(data2_pp, data_properties, seg1_pp)
 
+    data2_pp, seg1_pp2 = stage2_preprocessor.preprocess_image(
+        data, data_properties, seg1_pp
+    )
+    seg2_pp, seg2 = stage2_predictor.predict(
+        data2_pp, data_properties, seg1_pp2, return_seg_without_pp=True
+    )
     rw = stage2_network.plans_manager.image_reader_writer_class()
-    rw.write_seg(seg2, image_filepaths[0].save_path, data_properties)
+    rw.write_seg(seg2_pp, image_filepath_struct.save_path, data_properties)
+
+    if debug:
+        write_seg(
+            seg1,
+            image_filepath_struct.save_path,
+            "seg1",
+            stage1_network.plans_manager,
+            data_properties,
+        )
+        write_seg(
+            seg1_pp,
+            image_filepath_struct.save_path,
+            "seg1_pp",
+            stage1_network.plans_manager,
+            data_properties,
+        )
+        write_seg(
+            seg1_pp,
+            image_filepath_struct.save_path,
+            "seg1_pp2",
+            stage1_network.plans_manager,
+            data_properties,
+        )
+        write_seg(
+            seg2,
+            image_filepath_struct.save_path,
+            "seg2",
+            stage2_network.plans_manager,
+            data_properties,
+        )
 
 
 def get_args() -> argparse.Namespace:
