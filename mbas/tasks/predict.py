@@ -1,23 +1,20 @@
 import argparse
-import copy
 import os
 import sys
 import pickle
 import time
 
-from typing import Tuple, Optional, List
+from typing import Optional, List
 
 import torch
 from torch import nn
-import SimpleITK as sitk
 import numpy as np
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from torch.backends import cudnn
 
 from mbas.training.mbasTrainer import mbasTrainer
 from mbas.utils.binary_dilation_transform import binary_dilation_transform
 
-# from acvl_utils.cropping_and_padding.padding import pad_nd_image
 from nnunetv2.utilities.plans_handling.plans_handler import (
     PlansManager,
     ConfigurationManager,
@@ -30,11 +27,9 @@ from nnunetv2.preprocessing.preprocessors.default_preprocessor import (
 )
 from nnunetv2.inference.sliding_window_prediction import compute_gaussian
 
-#     compute_steps_for_sliding_window
 from nnunetv2.utilities.helpers import empty_cache
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 from nnunetv2.inference.export_prediction import (
-    export_prediction_from_logits,
     convert_predicted_logits_to_segmentation_with_correct_shape,
 )
 
@@ -44,13 +39,25 @@ from nnunetv2.postprocessing.remove_connected_components import (
 
 
 @dataclass
+class Parameters1Stage:
+    checkpoint: dict
+    dataset: dict
+    plans: dict
+    postprocessing_kwargs: list
+    skip_postprocessing: bool
+
+
+@dataclass
 class Parameters2Stage:
     stage1_checkpoint: dict
     stage1_dataset: dict
     stage1_plans: dict
+    stage1_postprocessing_kwargs: list
+
     stage2_checkpoint: dict
     stage2_dataset: dict
     stage2_plans: dict
+    stage2_postprocessing_kwargs: list
 
 
 @dataclass
@@ -61,6 +68,7 @@ class NetworkConfig:
     trainer_name: str
     inference_allowed_mirroring_axes: List[int]
     postprocessing_kwargs: List[dict]
+    skip_postprocessing: bool
 
 
 def initialize_model(
@@ -69,6 +77,7 @@ def initialize_model(
     plans: dict,
     postprocessing_kwargs: list,
     compiled_model: bool = False,
+    skip_postprocessing: bool = False,
 ):
     plans_manager = PlansManager(plans)
     trainer_name = checkpoint["trainer_name"]
@@ -96,7 +105,7 @@ def initialize_model(
         network = torch.compile(network)
 
     network.eval()
-    print("Network initialized")
+    print(f"Network initialized: {type(network)}")
     return NetworkConfig(
         network=network,
         plans_manager=plans_manager,
@@ -104,6 +113,7 @@ def initialize_model(
         trainer_name=trainer_name,
         inference_allowed_mirroring_axes=inference_allowed_mirroring_axes,
         postprocessing_kwargs=postprocessing_kwargs,
+        skip_postprocessing=skip_postprocessing,
     )
 
 
@@ -161,8 +171,10 @@ class Preprocessor:
             If seg is None, then the returned segmentation mask is just the nonzero mask
         data_properties: data properties loaded alongisde the original volume
         """
-        if seg is not None and seg.ndim == 3:
-            seg = seg[np.newaxis, :]
+        if seg is not None:
+            seg = seg.astype(np.int8)
+            if seg.ndim == 3:
+                seg = seg[np.newaxis, :]
 
         data_pp, seg_pp = self.preprocessor.run_case_npy(
             data,
@@ -189,7 +201,7 @@ class Predictor:
         self.device = torch.device("cuda")
 
         self.predictor = nnUNetPredictor(
-            tile_step_size=1.0,
+            tile_step_size=1.0,  # 1.0 for speedup. 0.5 for better results
             use_gaussian=True,
             use_mirroring=True,
             perform_everything_on_device=True,
@@ -214,6 +226,7 @@ class Predictor:
         data_properties: dict,
         seg_mask: Optional[torch.Tensor] = None,
         debug_return_intermediates: bool = False,
+        skip_postprocessing: bool = False,
     ):
         """
         data should be preprocessed
@@ -255,6 +268,14 @@ class Predictor:
             data_properties,
             return_probabilities=False,
         )
+        if skip_postprocessing:
+            print("Skipping postprocessing")
+            # clear lru cache
+            compute_gaussian.cache_clear()
+            # clear device cache
+            empty_cache(self.device)
+            return seg
+
         # for the 2nd stage, remove all but the largest component for each of the labels independently
         seg_pp = self.apply_postprocessing(seg)
 
@@ -347,33 +368,53 @@ class Predictor2Stage:
         return seg2_pp
 
 
-def write_seg(
-    seg: np.ndarray,
-    save_path: str,
-    seg_name: str,
-    plans_manager: PlansManager,
-    data_properties: dict,
-):
-    filename = os.path.basename(save_path)
-    dirname = os.path.dirname(save_path)
-    output_dir = os.path.join(dirname, seg_name)
-    os.makedirs(output_dir, exist_ok=True)
-    filepath = os.path.join(output_dir, filename)
-    rw = plans_manager.image_reader_writer_class()
-    rw.write_seg(seg, filepath, data_properties)
+class Predictor1Stage:
+    def __init__(self, parameters: Parameters1Stage, verbose: bool = False):
+        self.verbose = verbose
+        self.network = initialize_model(
+            parameters.checkpoint,
+            parameters.dataset,
+            parameters.plans,
+            parameters.postprocessing_kwargs,
+            compiled_model=False,
+            skip_postprocessing=parameters.skip_postprocessing,
+        )
+        self.preprocessor = Preprocessor(
+            self.network.plans_manager,
+            self.network.configuration_manager,
+            parameters.dataset,
+            verbose=verbose,
+        )
 
+        self.predictor = Predictor(self.network, parameters.dataset, verbose=verbose)
 
-def write_npy(
-    seg: np.ndarray,
-    save_path: str,
-    seg_name: str,
-):
-    filename = os.path.basename(save_path)
-    dirname = os.path.dirname(save_path)
-    output_dir = os.path.join(dirname, seg_name)
-    os.makedirs(output_dir, exist_ok=True)
-    filepath = os.path.join(output_dir, filename)
-    np.save(filepath, seg)
+        self.image_rw = self.network.plans_manager.image_reader_writer_class()
+
+    def predict_and_save(self, image_filepath_struct: Filepath):
+        t0 = time.time()
+        data, data_properties = self.preprocessor.load_image(image_filepath_struct.path)
+        if self.verbose:
+            print(f"Loading image took {time.time() - t0:.2f}s")
+        segmentation = self.predict(data, data_properties)
+        self.image_rw.write_seg(
+            segmentation, image_filepath_struct.save_path, data_properties
+        )
+
+    def predict(self, data: np.ndarray, data_properties: dict):
+        t0 = time.time()
+        data1_pp, _ = self.preprocessor.preprocess_image(data, data_properties)
+        t1 = time.time()
+        if self.verbose:
+            print(f"Stage 1 Preprocessing took {t1 - t0:.2f}s")
+        seg1_pp = self.predictor.predict(
+            data1_pp,
+            data_properties,
+            skip_postprocessing=self.network.skip_postprocessing,
+        )
+        t2 = time.time()
+        if self.verbose:
+            print(f"Stage 1 Prediction took {t2 - t1:.2f}s")
+        return seg1_pp
 
 
 def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
@@ -382,7 +423,7 @@ def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
     assert os.path.exists(model_pth), f"Model path {model_pth} does not exist"
 
     if torch.cuda.is_available():
-        cudnn.deterministic = False
+        cudnn.deterministic = True
         cudnn.benchmark = True
 
     torch.set_num_threads(1)
@@ -400,11 +441,12 @@ def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
     if isinstance(parameters, Parameters2Stage):
         print("Using 2-stage Predictor")
         predictor = Predictor2Stage(parameters, verbose=False)
+    elif isinstance(parameters, Parameters1Stage):
+        print("Using 1-stage Predictor")
+        predictor = Predictor1Stage(parameters, verbose=False)
     else:
         raise ValueError("Invalid parameters")
 
-    # elif isinstance(parameters, Paramters1Stage):
-    #     predictor = Predictor1Stage(parameters)
     image_filepaths = index_images(input_dir, output_dir)
     init_time = time.time() - start_time
     iter_times = []
@@ -435,7 +477,7 @@ Run inference on a directory of MRI volumes for the MBAS 2024 Challenge.
     parser.add_argument(
         "--input_dir",
         type=str,
-        default="/home/bryan/data/MBAS/Training",
+        default="/input",
         help="path to input",
     )
     parser.add_argument(
@@ -444,7 +486,7 @@ Run inference on a directory of MRI volumes for the MBAS 2024 Challenge.
     parser.add_argument(
         "--model_pth",
         type=str,
-        default="./save_pths/ABC_test.pth",
+        default="./save_pths/test.pth",
         help="model saved pth",
     )
     return parser.parse_args()
