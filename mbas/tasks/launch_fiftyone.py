@@ -141,13 +141,23 @@ def create_samples(subject_folders, train_test_split="train"):
     return samples
 
 
+def get_predictions_file(predictions_dir, patient_id_str):
+    filename = os.path.join(predictions_dir, f"{patient_id_str}.nii.gz")
+    if os.path.exists(filename):
+        return filename
+    filename = os.path.join(predictions_dir, f"{patient_id_str}_label.nii.gz")
+    if os.path.exists(filename):
+        return filename
+    return None
+
+
 def add_predictions_to_samples(
     samples, predictions_dir, predictions_name="predictions"
 ):
     for sample in samples:
         patient_id_str = sample["patient_id_str"]
-        predictions_file = os.path.join(predictions_dir, f"{patient_id_str}.nii.gz")
-        if os.path.exists(predictions_file):
+        predictions_file = get_predictions_file(predictions_dir, patient_id_str)
+        if predictions_file is not None:
             add_segmentation_to_sample(sample, predictions_file, predictions_name)
     return samples
 

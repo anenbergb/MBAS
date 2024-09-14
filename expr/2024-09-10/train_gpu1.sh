@@ -28,6 +28,7 @@ PLANS=plans_2024_09_10
 TRAINER=mbasTrainer
 PLANS=plans_2024_08_30
 MODEL=ResEncUNet_p20_256_dil2_batch_dice_cascade_ResEncUNet_08_27
-nnUNetv2_train 101 $MODEL all -tr $TRAINER -p $PLANS --c
-nnUNetv2_train 101 $MODEL 3 -tr $TRAINER -p $PLANS --c
-nnUNetv2_train 101 $MODEL 4 -tr $TRAINER -p $PLANS --c
+# nnUNetv2_train 101 $MODEL all -tr $TRAINER -p $PLANS --c
+# nnUNetv2_train 101 $MODEL 3 -tr $TRAINER -p $PLANS --c
+# nnUNetv2_train 101 $MODEL 4 -tr $TRAINER -p $PLANS --c
+nnUNetv2_find_best_configuration 101 -c $MODEL -tr $TRAINER -p $PLANS -f 0 1 2 3 4 --disable_ensembling
