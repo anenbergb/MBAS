@@ -189,7 +189,7 @@ class Predictor:
         self.device = torch.device("cuda")
 
         self.predictor = nnUNetPredictor(
-            tile_step_size=0.5,
+            tile_step_size=1.0,
             use_gaussian=True,
             use_mirroring=True,
             perform_everything_on_device=True,
@@ -221,7 +221,6 @@ class Predictor:
         # data shape (1,44,410,410)
         # prediction shape (2,44,410,410)
         prediction = self.predictor.predict_sliding_window_return_logits(data).to("cpu")
-        print(prediction.dtype)
 
         is_cascaded_mask = self.network_config.configuration_manager.configuration.get(
             "is_cascaded_mask", False
@@ -277,17 +276,20 @@ class Predictor:
 
 class Predictor2Stage:
     def __init__(self, parameters: Parameters2Stage, verbose: bool = False):
+        self.verbose = verbose
         self.stage1_network = initialize_model(
             parameters.stage1_checkpoint,
             parameters.stage1_dataset,
             parameters.stage1_plans,
             parameters.stage1_postprocessing_kwargs,
+            compiled_model=False,
         )
         self.stage2_network = initialize_model(
             parameters.stage2_checkpoint,
             parameters.stage2_dataset,
             parameters.stage2_plans,
             parameters.stage2_postprocessing_kwargs,
+            compiled_model=False,
         )
         self.stage1_preprocessor = Preprocessor(
             self.stage1_network.plans_manager,
@@ -312,21 +314,36 @@ class Predictor2Stage:
         self.image_rw = self.stage2_network.plans_manager.image_reader_writer_class()
 
     def predict_and_save(self, image_filepath_struct: Filepath):
+        t0 = time.time()
         data, data_properties = self.stage1_preprocessor.load_image(
             image_filepath_struct.path
         )
+        if self.verbose:
+            print(f"Loading image took {time.time() - t0:.2f}s")
         segmentation = self.predict(data, data_properties)
         self.image_rw.write_seg(
             segmentation, image_filepath_struct.save_path, data_properties
         )
 
     def predict(self, data: np.ndarray, data_properties: dict):
+        t0 = time.time()
         data1_pp, _ = self.stage1_preprocessor.preprocess_image(data, data_properties)
+        t1 = time.time()
+        if self.verbose:
+            print(f"Stage 1 Preprocessing took {t1 - t0:.2f}s")
         seg1_pp = self.stage1_predictor.predict(data1_pp, data_properties)
+        t2 = time.time()
+        if self.verbose:
+            print(f"Stage 1 Prediction took {t2 - t1:.2f}s")
         data2_pp, seg1_pp2 = self.stage2_preprocessor.preprocess_image(
             data, data_properties, seg1_pp
         )
+        t3 = time.time()
+        if self.verbose:
+            print(f"Stage 2 Preprocessing took {t3 - t2:.2f}s")
         seg2_pp = self.stage2_predictor.predict(data2_pp, data_properties, seg1_pp2)
+        if self.verbose:
+            print(f"Stage 2 Prediction took {time.time() - t3:.2f}s")
         return seg2_pp
 
 
@@ -381,7 +398,8 @@ def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
         parameters = pickle.load(f)
 
     if isinstance(parameters, Parameters2Stage):
-        predictor = Predictor2Stage(parameters)
+        print("Using 2-stage Predictor")
+        predictor = Predictor2Stage(parameters, verbose=False)
     else:
         raise ValueError("Invalid parameters")
 
@@ -390,10 +408,13 @@ def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
     image_filepaths = index_images(input_dir, output_dir)
     init_time = time.time() - start_time
     iter_times = []
-    for image_filepath_struct in image_filepaths[:50]:
+    for image_filepath_struct in image_filepaths[:5]:
         iter_start_time = time.time()
         predictor.predict_and_save(image_filepath_struct)
         iter_time = time.time() - iter_start_time
+        print(
+            f"Processing {os.path.basename(image_filepath_struct.path)} took {iter_time:.2f}s"
+        )
         iter_times.append(iter_time)
     total_min, total_sec = divmod(time.time() - start_time, 60)
     print(f"Initialization time: {init_time:.2f}s")

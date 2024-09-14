@@ -31,5 +31,6 @@ PLANS=plans_2024_09_10
 TRAINER=mbasTrainer
 PLANS=plans_2024_08_30
 MODEL=ResEncUNet_p20_256_dil2_batch_dice_cascade_ResEncUNet_08_27
-nnUNetv2_train 101 $MODEL 1 -tr $TRAINER -p $PLANS --c
-nnUNetv2_train 101 $MODEL 2 -tr $TRAINER -p $PLANS --c
+# nnUNetv2_train 101 $MODEL 1 -tr $TRAINER -p $PLANS --c
+# nnUNetv2_train 101 $MODEL 2 -tr $TRAINER -p $PLANS --c
+nnUNetv2_train 101 $MODEL 4 -tr $TRAINER -p $PLANS --c
