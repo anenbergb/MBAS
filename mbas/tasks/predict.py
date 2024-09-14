@@ -11,6 +11,7 @@ from torch import nn
 import SimpleITK as sitk
 import numpy as np
 from dataclasses import dataclass, field
+from torch.backends import cudnn
 
 from mbas.training.mbasTrainer import mbasTrainer
 from mbas.utils.binary_dilation_transform import binary_dilation_transform
@@ -62,15 +63,17 @@ class NetworkConfig:
 
 
 def initialize_model(
-    checkpoint: dict, dataset_json: dict, plans: dict, postprocessing_kwargs: list
+    checkpoint: dict,
+    dataset_json: dict,
+    plans: dict,
+    postprocessing_kwargs: list,
+    compiled_model: bool = False,
 ):
     plans_manager = PlansManager(plans)
     trainer_name = checkpoint["trainer_name"]
     configuration_name = checkpoint["init_args"]["configuration"]
-    inference_allowed_mirroring_axes = (
-        checkpoint["inference_allowed_mirroring_axes"]
-        if "inference_allowed_mirroring_axes" in checkpoint.keys()
-        else None
+    inference_allowed_mirroring_axes = checkpoint.get(
+        "inference_allowed_mirroring_axes"
     )
     parameters = checkpoint["network_weights"]
 
@@ -87,6 +90,10 @@ def initialize_model(
         enable_deep_supervision=False,
     )
     network.load_state_dict(parameters)
+    if compiled_model:
+        print("Using torch.compile")
+        network = torch.compile(network)
+
     network.eval()
     print("Network initialized")
     return NetworkConfig(
@@ -210,6 +217,7 @@ class Predictor:
         # data shape (1,44,410,410)
         # prediction shape (2,44,410,410)
         prediction = self.predictor.predict_sliding_window_return_logits(data).to("cpu")
+        print(prediction.dtype)
 
         is_cascaded_mask = self.network_config.configuration_manager.configuration.get(
             "is_cascaded_mask", False
@@ -252,7 +260,7 @@ class Predictor:
         # clear device cache
         empty_cache(self.device)
         if return_seg_without_pp:
-            return seg_pp, seg
+            return seg_pp, seg, prediction
         return seg_pp
 
     def apply_postprocessing(self, segmentation: np.ndarray):
@@ -279,11 +287,28 @@ def write_seg(
     rw.write_seg(seg, filepath, data_properties)
 
 
+def write_npy(
+    seg: np.ndarray,
+    save_path: str,
+    seg_name: str,
+):
+    filename = os.path.basename(save_path)
+    dirname = os.path.dirname(save_path)
+    output_dir = os.path.join(dirname, seg_name)
+    os.makedirs(output_dir, exist_ok=True)
+    filepath = os.path.join(output_dir, filename)
+    np.save(filepath, seg)
+
+
 def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
     debug = True
 
     assert os.path.exists(input_dir), f"Input directory {input_dir} does not exist"
     assert os.path.exists(model_pth), f"Model path {model_pth} does not exist"
+
+    if torch.cuda.is_available():
+        cudnn.deterministic = False
+        cudnn.benchmark = True
 
     torch.set_num_threads(1)
     torch.set_num_interop_threads(1)
@@ -329,20 +354,24 @@ def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
     image_filepath_struct = image_filepaths[4]
     data, data_properties = stage1_preprocessor.load_image(image_filepath_struct.path)
     data1_pp, _ = stage1_preprocessor.preprocess_image(data, data_properties)
-    seg1_pp, seg1 = stage1_predictor.predict(
+    seg1_pp, seg1, logits1 = stage1_predictor.predict(
         data1_pp, data_properties, return_seg_without_pp=True
     )
 
     data2_pp, seg1_pp2 = stage2_preprocessor.preprocess_image(
         data, data_properties, seg1_pp
     )
-    seg2_pp, seg2 = stage2_predictor.predict(
+    seg2_pp, seg2, _ = stage2_predictor.predict(
         data2_pp, data_properties, seg1_pp2, return_seg_without_pp=True
     )
     rw = stage2_network.plans_manager.image_reader_writer_class()
     rw.write_seg(seg2_pp, image_filepath_struct.save_path, data_properties)
 
     if debug:
+        write_npy(data, image_filepath_struct.save_path, "data")
+        write_npy(data1_pp, image_filepath_struct.save_path, "data1_pp")
+        write_npy(logits1.numpy(), image_filepath_struct.save_path, "logits1")
+
         write_seg(
             seg1,
             image_filepath_struct.save_path,
