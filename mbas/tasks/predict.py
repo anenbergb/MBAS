@@ -3,6 +3,7 @@ import copy
 import os
 import sys
 import pickle
+import time
 
 from typing import Tuple, Optional, List
 
@@ -134,15 +135,16 @@ class Preprocessor:
         plans_manager: PlansManager,
         configuration_manager: ConfigurationManager,
         dataset_json: dict,
+        verbose: bool = False,
     ):
         self.plans_manager = plans_manager
         self.configuration_manager = configuration_manager
         self.dataset_json = dataset_json
-        self.preprocessor = DefaultPreprocessor(verbose=True)
+        self.preprocessor = DefaultPreprocessor(verbose=verbose)
+        self.image_rw = self.plans_manager.image_reader_writer_class()
 
     def load_image(self, image_filepath: str):
-        rw = self.plans_manager.image_reader_writer_class()
-        data, data_properties = rw.read_images([image_filepath])
+        data, data_properties = self.image_rw.read_images([image_filepath])
         return data, data_properties
 
     def preprocess_image(
@@ -180,7 +182,9 @@ class Preprocessor:
 
 
 class Predictor:
-    def __init__(self, network_config: NetworkConfig, dataset_json: dict):
+    def __init__(
+        self, network_config: NetworkConfig, dataset_json: dict, verbose: bool = False
+    ):
         self.network_config = network_config
         self.device = torch.device("cuda")
 
@@ -190,9 +194,9 @@ class Predictor:
             use_mirroring=True,
             perform_everything_on_device=True,
             device=self.device,
-            verbose=True,
-            allow_tqdm=True,
-            verbose_preprocessing=True,
+            verbose=verbose,
+            allow_tqdm=verbose,
+            verbose_preprocessing=verbose,
         )
         self.predictor.manual_initialization(
             network=network_config.network,
@@ -209,7 +213,7 @@ class Predictor:
         data: torch.Tensor,
         data_properties: dict,
         seg_mask: Optional[torch.Tensor] = None,
-        return_seg_without_pp: bool = False,
+        debug_return_intermediates: bool = False,
     ):
         """
         data should be preprocessed
@@ -259,7 +263,7 @@ class Predictor:
         compute_gaussian.cache_clear()
         # clear device cache
         empty_cache(self.device)
-        if return_seg_without_pp:
+        if debug_return_intermediates:
             return seg_pp, seg, prediction
         return seg_pp
 
@@ -269,6 +273,61 @@ class Predictor:
                 segmentation, **kwargs
             )
         return segmentation
+
+
+class Predictor2Stage:
+    def __init__(self, parameters: Parameters2Stage, verbose: bool = False):
+        self.stage1_network = initialize_model(
+            parameters.stage1_checkpoint,
+            parameters.stage1_dataset,
+            parameters.stage1_plans,
+            parameters.stage1_postprocessing_kwargs,
+        )
+        self.stage2_network = initialize_model(
+            parameters.stage2_checkpoint,
+            parameters.stage2_dataset,
+            parameters.stage2_plans,
+            parameters.stage2_postprocessing_kwargs,
+        )
+        self.stage1_preprocessor = Preprocessor(
+            self.stage1_network.plans_manager,
+            self.stage1_network.configuration_manager,
+            parameters.stage1_dataset,
+            verbose=verbose,
+        )
+        self.stage2_preprocessor = Preprocessor(
+            self.stage2_network.plans_manager,
+            self.stage2_network.configuration_manager,
+            parameters.stage2_dataset,
+            verbose=verbose,
+        )
+
+        self.stage1_predictor = Predictor(
+            self.stage1_network, parameters.stage1_dataset, verbose=verbose
+        )
+        self.stage2_predictor = Predictor(
+            self.stage2_network, parameters.stage2_dataset, verbose=verbose
+        )
+
+        self.image_rw = self.stage2_network.plans_manager.image_reader_writer_class()
+
+    def predict_and_save(self, image_filepath_struct: Filepath):
+        data, data_properties = self.stage1_preprocessor.load_image(
+            image_filepath_struct.path
+        )
+        segmentation = self.predict(data, data_properties)
+        self.image_rw.write_seg(
+            segmentation, image_filepath_struct.save_path, data_properties
+        )
+
+    def predict(self, data: np.ndarray, data_properties: dict):
+        data1_pp, _ = self.stage1_preprocessor.preprocess_image(data, data_properties)
+        seg1_pp = self.stage1_predictor.predict(data1_pp, data_properties)
+        data2_pp, seg1_pp2 = self.stage2_preprocessor.preprocess_image(
+            data, data_properties, seg1_pp
+        )
+        seg2_pp = self.stage2_predictor.predict(data2_pp, data_properties, seg1_pp2)
+        return seg2_pp
 
 
 def write_seg(
@@ -301,8 +360,7 @@ def write_npy(
 
 
 def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
-    debug = True
-
+    start_time = time.time()
     assert os.path.exists(input_dir), f"Input directory {input_dir} does not exist"
     assert os.path.exists(model_pth), f"Model path {model_pth} does not exist"
 
@@ -322,84 +380,25 @@ def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
     with open(model_pth, "rb") as f:
         parameters = pickle.load(f)
 
+    if isinstance(parameters, Parameters2Stage):
+        predictor = Predictor2Stage(parameters)
+    else:
+        raise ValueError("Invalid parameters")
+
+    # elif isinstance(parameters, Paramters1Stage):
+    #     predictor = Predictor1Stage(parameters)
     image_filepaths = index_images(input_dir, output_dir)
-
-    stage1_network = initialize_model(
-        parameters.stage1_checkpoint,
-        parameters.stage1_dataset,
-        parameters.stage1_plans,
-        parameters.stage1_postprocessing_kwargs,
-    )
-    stage2_network = initialize_model(
-        parameters.stage2_checkpoint,
-        parameters.stage2_dataset,
-        parameters.stage2_plans,
-        parameters.stage2_postprocessing_kwargs,
-    )
-
-    stage1_preprocessor = Preprocessor(
-        stage1_network.plans_manager,
-        stage1_network.configuration_manager,
-        parameters.stage1_dataset,
-    )
-    stage2_preprocessor = Preprocessor(
-        stage2_network.plans_manager,
-        stage2_network.configuration_manager,
-        parameters.stage2_dataset,
-    )
-
-    stage1_predictor = Predictor(stage1_network, parameters.stage1_dataset)
-    stage2_predictor = Predictor(stage2_network, parameters.stage2_dataset)
-
-    image_filepath_struct = image_filepaths[4]
-    data, data_properties = stage1_preprocessor.load_image(image_filepath_struct.path)
-    data1_pp, _ = stage1_preprocessor.preprocess_image(data, data_properties)
-    seg1_pp, seg1, logits1 = stage1_predictor.predict(
-        data1_pp, data_properties, return_seg_without_pp=True
-    )
-
-    data2_pp, seg1_pp2 = stage2_preprocessor.preprocess_image(
-        data, data_properties, seg1_pp
-    )
-    seg2_pp, seg2, _ = stage2_predictor.predict(
-        data2_pp, data_properties, seg1_pp2, return_seg_without_pp=True
-    )
-    rw = stage2_network.plans_manager.image_reader_writer_class()
-    rw.write_seg(seg2_pp, image_filepath_struct.save_path, data_properties)
-
-    if debug:
-        write_npy(data, image_filepath_struct.save_path, "data")
-        write_npy(data1_pp, image_filepath_struct.save_path, "data1_pp")
-        write_npy(logits1.numpy(), image_filepath_struct.save_path, "logits1")
-
-        write_seg(
-            seg1,
-            image_filepath_struct.save_path,
-            "seg1",
-            stage1_network.plans_manager,
-            data_properties,
-        )
-        write_seg(
-            seg1_pp,
-            image_filepath_struct.save_path,
-            "seg1_pp",
-            stage1_network.plans_manager,
-            data_properties,
-        )
-        write_seg(
-            seg1_pp,
-            image_filepath_struct.save_path,
-            "seg1_pp2",
-            stage1_network.plans_manager,
-            data_properties,
-        )
-        write_seg(
-            seg2,
-            image_filepath_struct.save_path,
-            "seg2",
-            stage2_network.plans_manager,
-            data_properties,
-        )
+    init_time = time.time() - start_time
+    iter_times = []
+    for image_filepath_struct in image_filepaths[:50]:
+        iter_start_time = time.time()
+        predictor.predict_and_save(image_filepath_struct)
+        iter_time = time.time() - iter_start_time
+        iter_times.append(iter_time)
+    total_min, total_sec = divmod(time.time() - start_time, 60)
+    print(f"Initialization time: {init_time:.2f}s")
+    print(f"Average iteration time: {np.mean(iter_times):.2f}s")
+    print(f"Total time: {int(total_min)}min {total_sec:.2f}s")
 
 
 def get_args() -> argparse.Namespace:
