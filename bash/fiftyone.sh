@@ -59,8 +59,21 @@ conda activate $CONDA
 # -b /home/bryan/expr/mbas_nnUNet_results/Dataset104_MBAS/mbasTrainer__plans_2024_08_27__ResEncUNet_3d_lowres_for25_drop50_slim96/crossval_results_folds_0_1_2_3_4 \
 # --port 5151
 
+# python mbas/tasks/launch_fiftyone.py \
+# --data-dir /home/bryan/data/MBAS \
+# --dataset-name mbas_videos2 \
+# -p /home/bryan/expr/MBAS/final_submissions/output/test_00 \
+# --port 5151
+
+
+# python mbas/tasks/launch_fiftyone.py \
+# --data-dir /home/bryan/data/MBAS \
+# --dataset-name mbas_videos \
+# -p /home/bryan/expr/MBAS/final_submissions/test_docker_03 \
+# --port 5151
+
 python mbas/tasks/launch_fiftyone.py \
 --data-dir /home/bryan/data/MBAS \
---dataset-name mbas_videos2 \
--p /home/bryan/expr/MBAS/final_submissions/output/test_00 \
+--dataset-name mbas_videos \
+-p /home/bryan/expr/MBAS/final_submissions/val_docker_03 \
 --port 5151

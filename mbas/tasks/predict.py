@@ -450,7 +450,7 @@ def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
     image_filepaths = index_images(input_dir, output_dir)
     init_time = time.time() - start_time
     iter_times = []
-    for image_filepath_struct in image_filepaths[:5]:
+    for image_filepath_struct in image_filepaths:
         iter_start_time = time.time()
         predictor.predict_and_save(image_filepath_struct)
         iter_time = time.time() - iter_start_time
