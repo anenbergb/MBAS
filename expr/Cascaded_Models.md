@@ -9,6 +9,7 @@ The 2nd stage cascaded models marked with `_patch96` were trained with a `16, 96
 
 As observed from the results, the nnU-Net style cascade results in worse performance.
 All attempts at cascaded training performed worse than the stage 1 model alone! (The base model was nnUNetTrainer_MedNeXt__MedNeXtPlans__3d_fullres )
+
 ```
 |    | model                                                                                                         |   Rank |   Avg_Rank |   DSC_wall |   HD95_wall |   DSC_right |   HD95_right |   DSC_left |   HD95_left |
 |----|---------------------------------------------------------------------------------------------------------------|--------|------------|------------|-------------|-------------|--------------|------------|-------------|
