@@ -1,19 +1,20 @@
 # Paper tables
 ## First Stage Binary Segmentation Model Experiments
 
-|    | model                                                                        |   Rank |   Avg_Rank |   DSC_atrium |   OVERLAP_atrium |   HD95_atrium |
-|----|------------------------------------------------------------------------------|--------|------------|--------------|------------------|---------------|
-|  8 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.25_M_16_256_nblocks3 |      1 |          1 |     0.933403 |         0.940038 |       3.48028 |
-|  7 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.25_M_16_256          |      2 |          2 |     0.932349 |         0.939705 |       3.58482 |
-|  6 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_40_256_nblocks3  |      3 |          3 |     0.933596 |         0.935365 |       3.32731 |
-|  4 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_16_256           |      4 |          4 |     0.933949 |         0.934746 |       3.41017 |
-|  1 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres                    |      5 |          5 |     0.934025 |         0.934561 |       3.39874 |
-|  5 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_16_256_nblocks3  |      6 |          6 |     0.933803 |         0.934545 |       3.4339  |
-|  0 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_fullres                   |      7 |          7 |     0.932549 |         0.930944 |       3.51358 |
-| 10 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.5_M_16_256_nblocks3  |      8 |          8 |     0.931221 |         0.929839 |       3.54931 |
-|  9 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.5_M_16_256           |      9 |          9 |     0.930668 |         0.928931 |       3.63163 |
-|  2 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_32_256             |     10 |         10 |     0.472544 |         0.475942 |     137.721   |
-|  3 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_32_256_nblocks3    |     11 |         11 |     0.473494 |         0.475621 |     119.312   |
+|    | model                                                                        |   Rank |   Avg_Rank |   OVERLAP_atrium |   DSC_atrium |   HD95_atrium |
+|----|------------------------------------------------------------------------------|--------|------------|------------------|--------------|---------------|
+|  0 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.25_M_16_256_nblocks3 |      1 |          1 |         0.940038 |     0.933403 |       3.48028 |
+|  1 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.25_M_16_256          |      2 |          2 |         0.939705 |     0.932349 |       3.58482 |
+|  2 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_40_256_nblocks3  |      3 |          3 |         0.935365 |     0.933596 |       3.32731 |
+|  3 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_16_256           |      4 |          4 |         0.934746 |     0.933949 |       3.41017 |
+|  4 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres                    |      5 |          5 |         0.934561 |     0.934025 |       3.39874 |
+|  5 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_16_256_nblocks3  |      6 |          6 |         0.934545 |     0.933803 |       3.4339  |
+|  6 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_fullres                   |      7 |          7 |         0.930944 |     0.932549 |       3.51358 |
+|  7 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.5_M_16_256_nblocks3  |      8 |          8 |         0.929839 |     0.931221 |       3.54931 |
+|  8 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.5_M_16_256           |      9 |          9 |         0.928931 |     0.930668 |       3.63163 |
+|  9 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_32_256             |     10 |         10 |         0.475942 |     0.472544 |     137.721   |
+| 10 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_32_256_nblocks3    |     11 |         11 |         0.475621 |     0.473494 |     119.312   |
+
 
 
 
