@@ -3,17 +3,17 @@
 
 |    | model                                                                        |   Rank |   Avg_Rank |   OVERLAP_atrium |   DSC_atrium |   HD95_atrium |
 |----|------------------------------------------------------------------------------|--------|------------|------------------|--------------|---------------|
-|  0 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.25_M_16_256_nblocks3 |      1 |          1 |         0.940038 |     0.933403 |       3.48028 |
-|  1 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.25_M_16_256          |      2 |          2 |         0.939705 |     0.932349 |       3.58482 |
-|  2 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_40_256_nblocks3  |      3 |          3 |         0.935365 |     0.933596 |       3.32731 |
-|  3 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_16_256           |      4 |          4 |         0.934746 |     0.933949 |       3.41017 |
-|  4 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres                    |      5 |          5 |         0.934561 |     0.934025 |       3.39874 |
-|  5 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_16_256_nblocks3  |      6 |          6 |         0.934545 |     0.933803 |       3.4339  |
-|  6 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_fullres                   |      7 |          7 |         0.930944 |     0.932549 |       3.51358 |
-|  7 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.5_M_16_256_nblocks3  |      8 |          8 |         0.929839 |     0.931221 |       3.54931 |
-|  8 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.5_M_16_256           |      9 |          9 |         0.928931 |     0.930668 |       3.63163 |
-|  9 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_32_256             |     10 |         10 |         0.475942 |     0.472544 |     137.721   |
-| 10 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_32_256_nblocks3    |     11 |         11 |         0.475621 |     0.473494 |     119.312   |
+|  0 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.25_M_16_256_nblocks3 |      1 |      1.000 |            0.940 |        0.933 |         3.480 |
+|  1 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.25_M_16_256          |      2 |      2.000 |            0.940 |        0.932 |         3.585 |
+|  2 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_40_256_nblocks3  |      3 |      3.000 |            0.935 |        0.934 |         3.327 |
+|  3 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_16_256           |      4 |      4.000 |            0.935 |        0.934 |         3.410 |
+|  4 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_lowres                    |      5 |      5.000 |            0.935 |        0.934 |         3.399 |
+|  5 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.0_M_16_256_nblocks3  |      6 |      6.000 |            0.935 |        0.934 |         3.434 |
+|  6 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__3d_fullres                   |      7 |      7.000 |            0.931 |        0.933 |         3.514 |
+|  7 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.5_M_16_256_nblocks3  |      8 |      8.000 |            0.930 |        0.931 |         3.549 |
+|  8 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__lowres1.5_M_16_256           |      9 |      9.000 |            0.929 |        0.931 |         3.632 |
+|  9 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_32_256             |     10 |     10.000 |            0.476 |        0.473 |       137.721 |
+| 10 | mbasTrainer__nnUNetResEncUNetMPlans_2024_08_10__fullres_M_32_256_nblocks3    |     11 |     11.000 |            0.476 |        0.473 |       119.312 |
 
 
 
