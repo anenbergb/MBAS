@@ -239,6 +239,14 @@ With ball dilation  = 2
 | HD95_atrium    |  7.98733  | 1.95485    |
 | OVERLAP_atrium |  0.992133 | 0.00926877 |
 
+With ball dilation  = 3
+|                |   Average |        STD |                                                                                                                                  
+|----------------|-----------|------------|                                                                                                                                  
+| DSC_atrium     |  0.7723   | 0.0331598  |                                                                                                                                  
+| HD95_atrium    |  7.98733  | 1.95485    |                                                                                                                                  
+| OVERLAP_atrium |  0.992133 | 0.00926877 |       
+
+
 Notice that the OVERLAP metric is increased
 
 ### Average metrics with and without ball dilation measured per class
