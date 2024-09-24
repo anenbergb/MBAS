@@ -201,7 +201,7 @@ class Predictor:
         self.device = torch.device("cuda")
 
         self.predictor = nnUNetPredictor(
-            tile_step_size=1.0,  # 1.0 for speedup. 0.5 for better results
+            tile_step_size=0.5,  # 1.0 for speedup. 0.5 for better results
             use_gaussian=True,
             use_mirroring=True,
             perform_everything_on_device=True,
@@ -440,7 +440,7 @@ def predict_main(gpu: str, input_dir: str, output_dir: str, model_pth: str):
 
     if isinstance(parameters, Parameters2Stage):
         print("Using 2-stage Predictor")
-        predictor = Predictor2Stage(parameters, verbose=False)
+        predictor = Predictor2Stage(parameters, verbose=True)
     elif isinstance(parameters, Parameters1Stage):
         print("Using 1-stage Predictor")
         predictor = Predictor1Stage(parameters, verbose=False)

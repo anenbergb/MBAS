@@ -104,6 +104,7 @@ class MBASTrainerConfigurator:
                 "order_z": 0,
                 "force_separate_z": None,
             },
+            "preprocessor_name": "DefaultPreprocessor",
         }
         for k, v in args_dict.items():
             if k != "self":

@@ -5,7 +5,6 @@ import sys
 from typing import List
 
 from loguru import logger
-from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import torchio as tio
@@ -32,8 +31,8 @@ COLUMN_ORDERS = [
     "HD95_right",
     "DSC_left",
     "HD95_left",
-    "DSC_atrium",
     "OVERLAP_atrium",
+    "DSC_atrium",
     "HD95_atrium",
 ]
 
@@ -49,7 +48,7 @@ def find_results_directories(result_root_dir: str, match: str) -> list[str]:
 def compute_per_model_metrics(
     subjects: list[tio.Subject],
     results_dirs: list[str],
-    results_dir_match: str,
+    model_names: list[str],
     label_key: str = "label",
 ):
     if label_key == "label":
@@ -61,9 +60,7 @@ def compute_per_model_metrics(
 
     avg_metrics_dict = []
     std_metrics_dict = []
-    for results_dir in results_dirs:
-        prefix = results_dir[: -len(results_dir_match)].rstrip("/")
-        model_name = os.path.basename(prefix)
+    for results_dir, model_name in zip(results_dirs, model_names):
         logger.info(f"Processing {model_name}")
         df = compute_per_subject_metrics(
             subjects, results_dir, label_key=label_key, label_dict=label_dict
@@ -163,11 +160,9 @@ def load_cache(cache_filepath: str):
     return dfs, models
 
 
-def filter_results_with_cache(results_dirs, results_dir_match, cache_models):
+def filter_results_with_cache(results_dirs, model_names, cache_models):
     filtered_results = []
-    for results_dir in results_dirs:
-        prefix = results_dir[: -len(results_dir_match)].rstrip("/")
-        model_name = os.path.basename(prefix)
+    for results_dir, model_name in zip(results_dirs, model_names):
         if model_name not in cache_models:
             filtered_results.append(results_dir)
     return filtered_results
@@ -181,6 +176,7 @@ def metrics_table(
     save_filepath: str | None = None,
     label_key: str = "label",
     metrics_to_rank: List[str] = ["DSC", "HD"],
+    override_model_names: List[str] = [],
 ):
     subjects = load_subjects(dataset_dir, add_binary=label_key == "binary_label")
     logger.info(f"Loaded { len(subjects)} subjects")
@@ -197,18 +193,34 @@ def metrics_table(
         )
         print()
 
-    results_dirs = []
-    for root in root_results_dirs:
-        results_dirs.extend(find_results_directories(root, results_dir_match))
-    results_dirs = sorted(results_dirs)
-    logger.info(f"Found {len(results_dirs)} results directories")
-    results_dirs = filter_results_with_cache(
-        results_dirs, results_dir_match, cache_models
-    )
+    if len(override_model_names) > 0:
+        assert len(root_results_dirs) == len(
+            override_model_names
+        ), "Number of model names must match number of results directories"
+        results_dirs = root_results_dirs
+        model_names = override_model_names
+    else:
+        results_dirs = []
+        for root in root_results_dirs:
+            results_dirs.extend(find_results_directories(root, results_dir_match))
+        results_dirs = sorted(results_dirs)
+        model_names = [
+            os.path.basename(x[: -len(results_dir_match)].rstrip("/"))
+            for x in results_dirs
+        ]
 
+    logger.info(f"Found {len(results_dirs)} results directories")
+
+    results_dirs, model_names = zip(
+        *[
+            (r, name)
+            for r, name in zip(results_dirs, model_names)
+            if name not in cache_models
+        ]
+    )
     logger.info(f"Processing {len(results_dirs)} results directories")
     per_model_metrics_df, per_model_std_df = compute_per_model_metrics(
-        subjects, results_dirs, results_dir_match, label_key=label_key
+        subjects, results_dirs, model_names, label_key=label_key
     )
     if cache_dfs is not None:
         per_model_metrics_df = pd.concat(
@@ -235,10 +247,16 @@ def metrics_table(
         pickle.dump(save_struct, f)
     logger.info(f"Saved metrics to {save_filepath}")
     logger.info("Metrics Table:")
-    print(tabulate(per_model_metrics_df, headers="keys", tablefmt="github"))
+    print(
+        tabulate(
+            per_model_metrics_df, headers="keys", tablefmt="github", floatfmt=".3f"
+        )
+    )
     print()
     logger.info("Ranks Table:")
-    print(tabulate(per_model_ranks_df, headers="keys", tablefmt="github"))
+    print(
+        tabulate(per_model_ranks_df, headers="keys", tablefmt="github", floatfmt=".3f")
+    )
 
 
 def get_args() -> argparse.Namespace:
@@ -284,6 +302,12 @@ Compute Dice score and Hausdorff distance across all experiments.
         nargs="+",
         default=["DSC", "HD"],
     )
+    parser.add_argument(
+        "--override-model-names",
+        type=str,
+        nargs="+",
+        default=[],
+    )
     return parser.parse_args()
 
 
@@ -298,5 +322,6 @@ if __name__ == "__main__":
             args.save,
             args.label_key,
             args.metrics_to_rank,
+            args.override_model_names,
         )
     )
