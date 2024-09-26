@@ -97,3 +97,20 @@ Doesn't affect accuracy.
 ### Closing Remarks
 * Demonstrate that a pure ConvNet can outperform the Swin Transformer for ImageNet-1k classification by modernizing the ConvNet by applying many of the vision Transformer design choices.
 * The new ConvNet has approximately the same number of FLOPs, #params, throughput, and memory usage as Swin Transformer but doesn't require the specialized modules such as shifited window attention or relative position biases.
+
+## Emperical Evaluation on Downstream Tasks
+### Object detection and segmentation on COCO
+Use Mask R-CNN and Cascade Mask R-CNN on COCO dataset with ConvNeXt backbones.
+ConvNeXt is on-par or better than Swin Transformers
+### Semantic segmentation on ADE20k
+Use UperNet
+ConvNeXt achieves competitive performance across different model capacities
+### Remarks on model efficiency
+* Under similar FLOPs, depthwise convs are known to be slower and consume more memory than ConvNets with dense convs
+* However, ConvNeXt models are comparable speed to Swin Transformers
+* ConvNeXt models require less memory than Swin Transformers
+* Both ConvNeXt and Swin Transformers have more favorable accuracy-FLOPs trade-off than vanilla ViT due to the local computations. This improved efficiency is the "ConvNet inductive bias".
+
+## Conclusion
+* the prior widely held belief was that vision Transforemrs are more accurate, efficient, and scalable than ConvNets
+* ConvNeXt model can compete favorably with state-of-the-art hierarchical vision Transformers (Swin) across multiple CV benchmarks
