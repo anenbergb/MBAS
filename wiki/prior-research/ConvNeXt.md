@@ -2,7 +2,7 @@
 References:
 * https://arxiv.org/abs/2201.03545
 
-![image](https://github.com/user-attachments/assets/4a7f3bd7-74b0-4fc2-bb2d-3a1e7f377358)
+<img width="575" alt="Screenshot 2024-09-25 at 5 14 13 PM" src="https://github.com/user-attachments/assets/94d3f7df-fcee-4d92-bae1-c7b029b624a0">
 
 ## Abstract
 * Swin Transformers (that reintroduced several ConvNet priors) and made Transformers practically viable as a generic vision backbone.
