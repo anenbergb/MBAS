@@ -2,6 +2,7 @@
 References:
 * https://arxiv.org/abs/2201.03545
 
+![image](https://github.com/user-attachments/assets/4a7f3bd7-74b0-4fc2-bb2d-3a1e7f377358)
 
 ## Abstract
 * Swin Transformers (that reintroduced several ConvNet priors) and made Transformers practically viable as a generic vision backbone.
@@ -34,3 +35,14 @@ Apply various design decisions
 3. Inverted bottleneck
 4. Large kernel size
 5. Various layer-wise micro design
+
+## Training Techniques
+2.7% percent of improvement comes from training techniques
+* AdamW optimizer
+* training recipe close to DeiT's and Swin Transformer's
+* training extended to 300 epochs from the original  90 for ResNets
+* data augmentation techniques such as Mixup, Cutmix, RandAugment, Random Erasing
+* regularization such as Stochastic Depth
+* label smoothing
+
+## Macro Design
