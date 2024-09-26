@@ -1,0 +1,36 @@
+# A ConvNet for the 2020s
+References:
+* https://arxiv.org/abs/2201.03545
+
+
+## Abstract
+* Swin Transformers (that reintroduced several ConvNet priors) and made Transformers practically viable as a generic vision backbone.
+* The superior performance of Swin Transformers can probably be attributed to the inductive bias of convolutions, rather than the inherit superiority of Transformers. 
+* They gradually "modernize" a ResNet towards the design of a vision Transformer 
+* ConvNeXts compete favorably with Transformers in term sof accuracy and scalability, achieving 87.8% ImageNet Top-1 accuracy, outperforming Swin Transformers on COCO detection and ADE20k segmentation.
+## Introduction
+ConvNet's inductive biases
+  * translation equivariance
+  * inherently efficient due to sliding-window application. shared computation.
+Vision Transformer (ViT)
+* patchify initial layer
+* generic Transformer backbone
+* primary focus of ViT is on scaling behavior -- large models and dataset sizes.
+* Transformers have superior scaling behavior -- multi-head self-attention being key component.
+* The quadratic complexity with respect to input size = very slow, won't work for higher resolution inputs.
+Transformer improvements
+* Hierarchical Transformers. Sliding window
+* Swin Transformers
+
+ConvNext
+* How do design decisions in Transformers impact ConvNets' performance?
+
+## Modernizing a ConvNet: a Roadmap
+1. ResNet-50 model
+2. Train it using the latest vision Transformer training techniques.
+Apply various design decisions
+1. Macro design
+2. ResNeXt
+3. Inverted bottleneck
+4. Large kernel size
+5. Various layer-wise micro design
