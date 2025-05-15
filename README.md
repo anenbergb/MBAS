@@ -161,19 +161,36 @@ Future directions include enhancing Stage 1 accuracy, improving robustness to la
 
 
 ## Installation 
+
 ```
-# create virtual environment
 pip install -e .[dev,notebook]
 ```
+Also install the [MBAS branch of nnUNet](https://github.com/anenbergb/nnUNet/tree/mbas). The MBAS project relies on the `nnUNetv2` routines such as `nnUNetv2_train` and `nnUNetv2_find_best_configuration` to train the custom 3D CNN models defined in this repo.
 ### Jupyter notebook development
 ```
 jupyter nbextension install itkwidgets --user --py
 jupyter nbextension enable itkwidgets --user --py
-
 jupyter notebook
 ```
 ### Tensorboard
 ```
 tensorboard --logdir=/path/to/logs --port 6006
 ```
+
+## ML Training
+The [./expr](expr) folder records the expansive experiments and ablation studies that were performed for this project.
+
+The [mbas/tasks](mbas/tasks) directory defines scripts to convert labels between formats, run inference, generate tables to report the metrics, and render videos.
+
+### Voxel51
+The opensource [Voxel51](https://voxel51.com/) application can be used to visualize the ground truth and predicted segmentation masks overlayed on the 3D MRI volume.
+```
+python mbas/tasks/launch_fiftyone.py \
+--data-dir /path/to/MBAS/dataset/with/videos \
+--dataset-name mbas_videos \
+-p /path/to/postprocessed/predictions \
+--port 5151
+```
+
+`/path/to/MBAS/dataset/with/videos` refers to the dataset directory containing the ground truth 3D segmentation masks along with a video rendered from the axial perspective for each MRI volume using the [mbas/tasks/render_subject_videos.py](mbas/tasks/render_subject_videos.py) script.
 
