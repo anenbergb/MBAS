@@ -4,6 +4,8 @@ This project presents a two-stage cascaded neural network approach for automatic
 
 This project was carried out with guidance from [Peter Chang, MD](https://www.faculty.uci.edu/profile/?facultyId=6569) and the [Center for Artificial Intelligence in Diagnostic Medicine](https://www.caidm.som.uci.edu/).
 
+![mbas-voxel51](https://github.com/user-attachments/assets/4e824dac-7fba-40a2-b0e4-13f5f58baf27)
+
 ## Task Description & Motivation
 
 Late Gadolinium Enhancement (LGE) MRI is a specialized cardiac imaging modality frequently acquired in the management of patients with atrial fibrillation (AF). It enhances fibrotic myocardial tissue after the injection of a gadolinium-based contrast agent, making it particularly useful for visualizing structural heart abnormalities.
@@ -174,3 +176,4 @@ jupyter notebook
 ```
 tensorboard --logdir=/path/to/logs --port 6006
 ```
+
