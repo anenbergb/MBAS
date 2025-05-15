@@ -1,6 +1,6 @@
 # 3D Cardiac Structure Segmentation with Two Stage Cascaded Neural Networks
 
-This project presents a two-stage cascaded neural network approach for automatic 3D semantic segmentation of cardiac structures in Late Gadolinium Enhancement MRI (LGE-MRI). The method was developed as a submission to the Multi-class Bi-Atrial Segmentation (MBAS) Challenge at MICCAI 2024 where it achieved **3rd place**.
+This project presents a two-stage cascaded neural network approach for automatic 3D semantic segmentation of cardiac structures in Late Gadolinium Enhancement MRI (LGE-MRI). The method was developed as a submission to the [Multi-class Bi-Atrial Segmentation (MBAS) Challenge at MICCAI 2024](https://codalab.lisn.upsaclay.fr/competitions/18516) where it achieved **3rd place**.
 
 This project was carried out with guidance from [Peter Chang, MD](https://www.faculty.uci.edu/profile/?facultyId=6569) and the [Center for Artificial Intelligence in Diagnostic Medicine](https://www.caidm.som.uci.edu/).
 
@@ -152,7 +152,7 @@ Despite strong results, the project faced several technical challenges:
 - Thin-walled atrial tissue is particularly difficult to segment due to low contrast and partial volume effects in LGE-MRI.
 - Anatomical ambiguity in the ground truth labels, especially at structure boundaries, posed limits to achievable precision and introduced inter-observer variability.
 
-Nevertheless, the proposed solution achieved **3rd place** in the **Multi-class Bi-Atrial Segmentation (MBAS) Challenge** at **MICCAI 2024 (STACOM workshop)** and was included in the official benchmarking study paper, validating both its technical rigor and clinical relevance.
+Nevertheless, the proposed solution achieved **3rd place** in the [Multi-class Bi-Atrial Segmentation (MBAS) Challenge](https://codalab.lisn.upsaclay.fr/competitions/18516) at MICCAI 2024 (STACOM workshop) and was included in the official benchmarking study paper, validating both its technical rigor and clinical relevance.
 
 Future directions include enhancing Stage 1 accuracy, improving robustness to labeling noise, and integrating the segmentation system into full clinical pipelines for AF ablation planning.
 
