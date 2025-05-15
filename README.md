@@ -59,7 +59,16 @@ Thus, automated and accurate segmentation of the atria is critical for improving
 3. **Architecture Highlights**  
    - 3D U-Net with residual connections
    - Deep supervision
-   - Adaptive patch-based training with nnU-Net heuristics
+   - trained on 3D patches sampled from the LGE-MRI volume because the full resolution 3D volume is too large to fit into GPU memory, especially when using deep 3D CNNs. 
+
+### Final Model: Results
+
+The table below summarizes the results of the proposed two stage cascaded model based on 5-fold cross-validation using Dice Similarity Coefficient (↑ better) and 95th percentile Hausdorff Distance (HD95 ↓ better). The final two-stage model's metrics were close to the ResEnc baseline.
+
+| Model             | Wall Dice | RA Dice | LA Dice | Wall HD95 | RA HD95 | LA HD95 | Description |
+|------------------|-----------|---------|---------|-----------|---------|---------|-------------|
+| Two-stage Final   | 0.711     | 0.920   | 0.930   | 2.99     | 3.59    | 3.98    | Final cascaded model submitted to MBAS |
+| ResEnc (M) baseline | 0.714   | 0.921  | 0.929  | 3.04  |  3.56  | 4.04 |  single stage nnU-Net ResEnc (M) baseline model |
 
 ## Experimental Design
 
@@ -75,21 +84,43 @@ Thus, automated and accurate segmentation of the atria is critical for improving
 - **nnU-Net ResEnc**: Residual U-Net within nnU-Net framework
 - **MedNeXt**: ConvNeXt-based architecture adapted for medical segmentation
 
-### Ablation Study Results
 
-| Model         | Wall Dice | RA Dice | LA Dice | Wall HD95 | RA HD95 | LA HD95 |
-|---------------|-----------|---------|---------|------------|----------|----------|
-| ResEnc (M)    | 0.7235    | 0.9231  | 0.9305  | 2.88       | 3.40     | 3.76     |
-| ResEnc (L)    | 0.7253    | 0.9257  | 0.9304  | 2.76       | 3.20     | 3.69     |
-| MedNeXt       | 0.724     | 0.926   | 0.932   | 2.84       | 3.03     | 3.94     |
-| Two-stage     | 0.711     | 0.920   | 0.930   | 3.03       | 3.61     | 3.99     |
+## Ablation Study Results
 
-### Key Observations
+Extensive experiments were conducted to explore the impact of model architecture, training configuration, and post-processing strategies. 
 
-- 3D convolutions outperformed 2D slice-based models
-- 100% foreground patch sampling improves performance
-- Largest component filtering and binary dilation reduce HD95 significantly
-- MedNeXt performed well but slightly under ResEnc
+2D vs. 3D Convolution
+- 3D convolution improved spatial continuity and outperformed 2D slice-based models (Dice +1–2%, HD95 −0.5 mm).
+
+Architecture and Size
+- The ResEnc (M) model provided the best balance between segmentation quality and computational efficiency.
+- Larger patch sizes, as used in ResEnc (L) and (XL), resulted in slightly better metrics but significantly higher GPU memory usage and training time.
+- MedNeXt architectures were competitive but did not consistently outperform ResEnc models on this specific segmentation task.
+
+Cascaded Architecture
+- The two-stage cascaded approach separates the problem into two subtasks:
+  - Stage 1 focuses on coarse localization of the atrial region (high recall).
+  - Stage 2 performs fine-grained multi-class segmentation within the localized mask (high precision).
+- While the cascaded model achieved similar metrics to the best single-stage baseline, theoretical analysis showed that improved binary masks from Stage 1 could significantly enhance final segmentation quality.
+
+Post-Processing and Loss Masking
+- Applying connected-component filtering in Stage 1 reduced large false-positive regions, leading to lower HD95 scores.
+- Morphological dilation (radius = 2) applied to the binary mask improved coverage of atrial boundaries at the cost of slight Dice reduction.
+- In Stage 2, masking the loss function using the Stage 1 binary mask enabled the network to focus only on the relevant foreground regions, improving learning efficiency and robustness.
+-  Using ground truth masks in Stage 2 (simulating a perfect first stage) boosted Dice to 0.95 and HD95 to approximately 2.4 mm.
+
+Training Strategies
+- Different sample input patch sizes (e.g. 28x256x224) and voxel spacing (e.g. 25x0.97x0.97) were evaluated. 
+- Foreground sampling probabilities of 25% or higher were critical for dealing with the extreme class imbalance in the data.
+- Batch Dice loss and deep supervision contributed to improved convergence and stability.
+- Data augmentation settings provided by nnU-Net (rotation, scaling, noise, contrast) worked well; custom augmentations provided no significant additional benefit.
+
+Inference Optimization
+- Changing the inference patch stride from 0.5 to 1.0 reduced runtime by approximately 43% per image on a NVIDIA RTX 4090 GPU.
+- This change had negligible effect on Dice and HD95 scores, making it a practical speedup for deployment.
+
+These experiments provide empirical justification for model choices and highlight areas for future improvement, particularly in enhancing Stage 1 localization performance.
+
 
 ### Training Configuration
 
@@ -113,12 +144,19 @@ To accelerate inference:
 
 ## Conclusion
 
-This project developed a robust and modular two-stage cascaded CNN system for segmenting atrial structures from LGE-MRI. The proposed architecture:
-- Achieved strong results on a challenging dataset
-- Showed benefits of foreground-guided loss masking
-- Demonstrated inference-time efficiency improvements
+This project developed a robust, empirically optimized two-stage cascaded neural network for automatic 3D segmentation of key atrial structures in LGE-MRI, including the right atrium cavity, left atrium cavity, and atrial walls. The approach follows a coarse-to-fine strategy: the first stage localizes the atrial region with high recall, and the second stage performs focused multi-class segmentation within that localized region to improve precision.
 
-While the final two-stage model's metrics were close to the ResEnc baseline, the framework enables structured experimentation and future improvements—especially with enhanced binary localization in Stage 1.
+The final model was designed through systematic ablation studies, exploring architectural variations, training strategies, and post-processing techniques. While the two-stage approach achieved similar metrics to the strongest single-stage baseline (nnU-Net ResEnc), it offers a modular and theoretically extensible framework. Simulated experiments using perfect binary masks in Stage 1 suggest that improved localization could further enhance performance.
+
+Despite strong results, the project faced several technical challenges:
+- Thin-walled atrial tissue is particularly difficult to segment due to low contrast and partial volume effects in LGE-MRI.
+- Anatomical ambiguity in the ground truth labels, especially at structure boundaries, posed limits to achievable precision and introduced inter-observer variability.
+
+Nevertheless, the proposed solution achieved **3rd place** in the **Multi-class Bi-Atrial Segmentation (MBAS) Challenge** at **MICCAI 2024 (STACOM workshop)** and was included in the official benchmarking study paper, validating both its technical rigor and clinical relevance.
+
+Future directions include enhancing Stage 1 accuracy, improving robustness to labeling noise, and integrating the segmentation system into full clinical pipelines for AF ablation planning.
+
+
 
 ## Installation 
 ```
