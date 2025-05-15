@@ -1,20 +1,46 @@
 # 3D Cardiac Structure Segmentation with Two Stage Cascaded Neural Networks
 
-This project presents a two-stage cascaded neural network approach for automatic 3D semantic segmentation of cardiac structures in Late Gadolinium Enhancement MRI (LGE-MRI). The method was developed as a submission to the Multi-class Bi-Atrial Segmentation (MBAS) Challenge at MICCAI 2024.
+This project presents a two-stage cascaded neural network approach for automatic 3D semantic segmentation of cardiac structures in Late Gadolinium Enhancement MRI (LGE-MRI). The method was developed as a submission to the Multi-class Bi-Atrial Segmentation (MBAS) Challenge at MICCAI 2024 where it achieved **3rd place**.
 
 This project was carried out with guidance from [Peter Chang, MD](https://www.faculty.uci.edu/profile/?facultyId=6569) and the [Center for Artificial Intelligence in Diagnostic Medicine](https://www.caidm.som.uci.edu/).
 
 ## Task Description & Motivation
 
-Accurate segmentation of the **Right Atrium Cavity**, **Left Atrium Cavity**, and **Left & Right Atrium Walls** is vital for evaluating atrial fibrillation treatment via LGE-MRI. However, due to low tissue contrast and imaging artifacts, automatic segmentation is challenging.
+Late Gadolinium Enhancement (LGE) MRI is a specialized cardiac imaging modality frequently acquired in the management of patients with atrial fibrillation (AF). It enhances fibrotic myocardial tissue after the injection of a gadolinium-based contrast agent, making it particularly useful for visualizing structural heart abnormalities.
 
-This work is motivated by the clinical need for precise 3D cardiac models to assist in diagnostic assessment and planning of catheter ablation procedures.
+This project addresses the critical task of **automated 3D semantic segmentation** of the heart atria in LGE-MRI images, specifically the:
+- **Right Atrium Cavity**
+- **Left Atrium Cavity**
+- **Left & Right Atrium Walls**
+
+Accurate segmentation of these structures is essential for building patient-specific 3D anatomical models, which clinicians use for diagnostic review and planning of catheter ablation procedures.
+
+The motivation for this task stems from the challenges posed by LGE-MRI:
+- Attenuated contrast in non-diseased tissue
+- Imaging artifacts and poor resolution
+- Significant variability in atrial anatomy
+
+These factors make manual segmentation labor-intensive and error-prone, highlighting the need for robust automated solutions—such as those developed for the MBAS Challenge at MICCAI 2024**.
 
 ## Clinical Relevance
 
-- **Atrial fibrosis visualization** via LGE-MRI is key for diagnosing and assessing cardiac arrhythmias.
-- Precise segmentation enables 3D modeling for **treatment planning** and **outcome prediction**.
-- Automating segmentation reduces reliance on expert annotation and improves reproducibility.
+Atrial fibrillation (AF) is a common cardiac arrhythmia that can be treated using catheter ablation. This minimally invasive procedure uses radiofrequency energy or cryotherapy to scar abnormal cardiac tissue, disrupting the errant electrical signals causing the arrhythmia.
+
+Key roles of LGE-MRI in AF management include:
+
+- Assessment of atrial fibrosis before treatment
+- Evaluation of ablation lesion quality post-procedure
+- Prediction of long-term success of ablation
+- Guidance of patient-specific ablation strategies
+
+The ablated (injured) tissue is replaced by fibrotic scar tissue, altering the electrical conduction pathways of the heart in a controlled manner.
+
+However, to leverage the full potential of LGE-MRI, clinicians must first isolate atrial structures from complex 3D scans. High-quality segmentation enables:
+- Volumetric and wall-thickness measurements
+- Electrophysiological modeling
+- Visualization for interventional planning
+
+Thus, automated and accurate segmentation of the atria is critical for improving outcomes in AF treatment workflows.
 
 ## Methodology
 
@@ -77,7 +103,7 @@ This work is motivated by the clinical need for precise 3D cardiac models to ass
 
 To accelerate inference:
 - Increased patch stride from 0.5 to 1.0
-- Reduced per-image runtime from **20.8s → 11.8s** (RTX 4090)
+- Reduced per-image runtime from **20.8s → 11.8s** (NVIDIA RTX 4090)
 - Maintained similar segmentation performance
 
 | Stride Size | Wall Dice | RA Dice | LA Dice | Wall HD95 | RA HD95 | LA HD95 |
@@ -93,7 +119,6 @@ This project developed a robust and modular two-stage cascaded CNN system for se
 - Demonstrated inference-time efficiency improvements
 
 While the final two-stage model's metrics were close to the ResEnc baseline, the framework enables structured experimentation and future improvements—especially with enhanced binary localization in Stage 1.
-
 
 ## Installation 
 ```
